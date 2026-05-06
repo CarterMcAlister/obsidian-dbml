@@ -1,6 +1,9 @@
+
 # Obsidian DBML
 
 DBML authoring, validation, generation, and diagram preview for Obsidian.
+
+<img width="2096" height="1428" alt="dbml-screenshot" src="https://github.com/user-attachments/assets/2962fe29-7daf-49b3-b1d7-eb80e4aea00d" />
 
 ## Features
 
