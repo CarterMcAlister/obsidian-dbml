@@ -1,0 +1,9 @@
+{
+  "id": "obsidian-dbml",
+  "name": "DBML",
+  "version": "1.0.0",
+  "minAppVersion": "1.5.0",
+  "description": "DBML authoring, validation, generation, and diagram preview for Obsidian.",
+  "author": "",
+  "isDesktopOnly": true
+}

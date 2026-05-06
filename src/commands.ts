@@ -1,0 +1,172 @@
+import { Modal, normalizePath, Notice, Setting, TAbstractFile, TFile, TFolder } from "obsidian";
+import type DbmlPlugin from "./main";
+import { resolveActiveDbmlSource } from "./dbml/source";
+import { ConnectionModal } from "./ui/connection-modal";
+
+export function registerCommands(plugin: DbmlPlugin): void {
+  plugin.registerEvent(plugin.app.workspace.on("file-menu", (menu, file) => {
+    const folder = folderForMenuTarget(file);
+    menu.addItem((item) => item
+      .setTitle("New database diagram")
+      .setIcon("layout-dashboard")
+      .onClick(() => void createDatabaseDiagram(plugin, folder.path)));
+  }));
+
+  plugin.addCommand({
+    id: "new-database-diagram",
+    name: "New database diagram",
+    callback: () => void createDatabaseDiagram(plugin, plugin.app.workspace.getActiveFile()?.parent?.path || "")
+  });
+
+  plugin.addCommand({
+    id: "open-preview-to-side",
+    name: "Open DBML preview to the side",
+    checkCallback: (checking) => {
+      const activeFile = plugin.app.workspace.getActiveFile();
+      if (!activeFile || !["dbml", "md"].includes(activeFile.extension.toLowerCase())) return false;
+      if (!checking) void plugin.openPreviewForActiveSource();
+      return true;
+    }
+  });
+
+  plugin.addCommand({
+    id: "generate-dbml-from-database-connection",
+    name: "Generate DBML from Database Connection",
+    callback: () => {
+      if (!plugin.settings.enableDatabaseGeneration) {
+        new Notice("Database generation is disabled in DBML settings.");
+        return;
+      }
+      new ConnectionModal(plugin.app).open();
+    }
+  });
+
+  plugin.addCommand({
+    id: "reset-dbml-diagram-state",
+    name: "Reset DBML diagram state",
+    callback: async () => {
+      const source = await resolveActiveDbmlSource(plugin.app);
+      if (!source) {
+        new Notice("Open a .dbml file or place the cursor inside a fenced dbml block.");
+        return;
+      }
+      await plugin.stateStore.delete(source.ref);
+      new Notice("DBML diagram state reset.");
+    }
+  });
+}
+
+async function createDatabaseDiagram(plugin: DbmlPlugin, folderPath: string): Promise<void> {
+  try {
+    const enteredName = await requestDatabaseDiagramName(plugin);
+    if (!enteredName) return;
+    const safeName = enteredName.trim().replace(/\.dbml$/i, "");
+    if (!safeName || /[<>:"/\\|?*]/.test(safeName)) {
+      new Notice("Invalid database diagram name.");
+      return;
+    }
+    const basePath = diagramPath(folderPath, safeName);
+    const path = await uniquePath(plugin, basePath);
+    const file = await plugin.app.vault.create(path, defaultDbmlTemplate(safeName));
+    const leaf = plugin.app.workspace.getLeaf(true);
+    await leaf.openFile(file);
+    plugin.app.workspace.revealLeaf(leaf);
+    new Notice(`Created ${path}`);
+  } catch (error) {
+    console.error("DBML: failed to create database diagram", error);
+    new Notice(`Failed to create database diagram: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function requestDatabaseDiagramName(plugin: DbmlPlugin): Promise<string | null> {
+  return new Promise((resolve) => new NewDatabaseDiagramModal(plugin, resolve).open());
+}
+
+class NewDatabaseDiagramModal extends Modal {
+  private value = "schema";
+  private submitted = false;
+
+  constructor(plugin: DbmlPlugin, private resolveName: (name: string | null) => void) {
+    super(plugin.app);
+  }
+
+  onOpen(): void {
+    this.setTitle("New database diagram");
+    this.contentEl.empty();
+
+    new Setting(this.contentEl)
+      .setName("Diagram name")
+      .setDesc("Creates a .dbml file in the selected folder.")
+      .addText((text) => {
+        text
+          .setPlaceholder("schema")
+          .setValue(this.value)
+          .onChange((value) => {
+            this.value = value;
+          });
+        text.inputEl.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          this.submit();
+        });
+        window.setTimeout(() => {
+          text.inputEl.focus();
+          text.inputEl.select();
+        });
+      });
+
+    new Setting(this.contentEl)
+      .addButton((button) => button
+        .setButtonText("Create")
+        .setCta()
+        .onClick(() => this.submit()))
+      .addButton((button) => button
+        .setButtonText("Cancel")
+        .onClick(() => this.close()));
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+    if (!this.submitted) this.resolveName(null);
+  }
+
+  private submit(): void {
+    const name = this.value.trim();
+    if (!name) {
+      new Notice("Enter a database diagram name.");
+      return;
+    }
+    this.submitted = true;
+    this.resolveName(name);
+    this.close();
+  }
+}
+
+async function uniquePath(plugin: DbmlPlugin, path: string): Promise<string> {
+  if (!plugin.app.vault.getAbstractFileByPath(path)) return path;
+  const withoutExt = path.replace(/\.dbml$/i, "");
+  for (let index = 2; index < 1000; index += 1) {
+    const candidate = `${withoutExt} ${index}.dbml`;
+    if (!plugin.app.vault.getAbstractFileByPath(candidate)) return candidate;
+  }
+  throw new Error("Could not create a unique DBML file name.");
+}
+
+function diagramPath(folderPath: string, safeName: string): string {
+  const folder = folderPath === "/" ? "" : folderPath;
+  return normalizePath([folder, `${safeName}.dbml`].filter(Boolean).join("/"));
+}
+
+function folderForMenuTarget(file: TAbstractFile): TFolder {
+  if (file instanceof TFolder) return file;
+  if (file instanceof TFile && file.parent) return file.parent;
+  return file.vault.getRoot();
+}
+
+function defaultDbmlTemplate(name: string): string {
+  return `Project ${quoteIdentifier(name)} {\n  database_type: 'PostgreSQL'\n}\n\nDiagramView Default {\n  *\n}\n\nTable users {\n  id int [primary key]\n  created_at timestamp\n}\n`;
+}
+
+function quoteIdentifier(value: string): string {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) ? value : `"${value.replace(/"/g, "\\\"")}"`;
+}
