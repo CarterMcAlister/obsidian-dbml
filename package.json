@@ -14,7 +14,7 @@
     "dbml",
     "dbdiagram"
   ],
-  "author": "",
+  "author": "CarterMcAlister",
   "license": "MIT",
   "devDependencies": {
     "@codemirror/language": "^6.10.8",

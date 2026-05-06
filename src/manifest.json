@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "minAppVersion": "1.5.0",
   "description": "DBML authoring, validation, generation, and diagram preview for Obsidian.",
-  "author": "",
+  "author": "CarterMcAlister",
+  "authorUrl": "https://github.com/CarterMcAlister",
   "isDesktopOnly": true
 }

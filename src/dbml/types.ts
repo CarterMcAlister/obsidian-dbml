@@ -56,9 +56,14 @@ export interface ResolvedDbmlSource {
   file: TFile;
 }
 
+export type DbmlDiagnosticSeverity = "error" | "warning" | "info";
+
 export interface DbmlDiagnostic {
   message: string;
-  code?: string;
+  code?: string | number;
+  type?: DbmlDiagnosticSeverity;
+  filepath?: string;
+  stack?: unknown;
   location: {
     start: { line: number; column: number };
     end: { line: number; column: number };
@@ -106,6 +111,13 @@ export interface DiagramModel {
   enums: Array<{ id: string; name: string; values: string[] }>;
 }
 
+export interface RendererFilterConfig {
+  tables: unknown[] | null;
+  schemas: unknown[] | null;
+  tableGroups: unknown[] | null;
+  stickyNotes: unknown[] | null;
+}
+
 export interface RendererUpdate {
   database: unknown | null;
   fullDatabase?: unknown | null;
@@ -113,5 +125,6 @@ export interface RendererUpdate {
   views?: Record<string, string>;
   selectedViewId?: string | null;
   defaultViewName?: string;
-  filterConfig?: unknown;
+  filterConfig?: RendererFilterConfig;
+  isFilterConfigDirty?: boolean;
 }

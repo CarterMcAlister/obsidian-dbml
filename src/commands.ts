@@ -1,7 +1,10 @@
 import { Modal, normalizePath, Notice, Setting, TAbstractFile, TFile, TFolder } from "obsidian";
 import type DbmlPlugin from "./main";
 import { resolveActiveDbmlSource } from "./dbml/source";
+import { normalizeDbmlSource } from "./dbml/export";
 import { ConnectionModal } from "./ui/connection-modal";
+import { ExportDbmlModal } from "./ui/export-modal";
+import { ImportDbmlModal } from "./ui/import-modal";
 
 export function registerCommands(plugin: DbmlPlugin): void {
   plugin.registerEvent(plugin.app.workspace.on("file-menu", (menu, file) => {
@@ -42,6 +45,24 @@ export function registerCommands(plugin: DbmlPlugin): void {
   });
 
   plugin.addCommand({
+    id: "import-dbml-from-sql-schemarb-json",
+    name: "Import DBML from SQL/SchemaRb/JSON",
+    callback: () => new ImportDbmlModal(plugin).open()
+  });
+
+  plugin.addCommand({
+    id: "export-active-dbml",
+    name: "Export active DBML as SQL/JSON/normalized DBML",
+    callback: () => new ExportDbmlModal(plugin).open()
+  });
+
+  plugin.addCommand({
+    id: "normalize-active-dbml",
+    name: "Normalize/format active DBML into a new file",
+    callback: () => void normalizeActiveDbml(plugin)
+  });
+
+  plugin.addCommand({
     id: "reset-dbml-diagram-state",
     name: "Reset DBML diagram state",
     callback: async () => {
@@ -54,6 +75,26 @@ export function registerCommands(plugin: DbmlPlugin): void {
       new Notice("DBML diagram state reset.");
     }
   });
+}
+
+async function normalizeActiveDbml(plugin: DbmlPlugin): Promise<void> {
+  try {
+    const source = await resolveActiveDbmlSource(plugin.app);
+    if (!source) {
+      new Notice("Open a .dbml file or place the cursor inside a fenced dbml block.");
+      return;
+    }
+    const normalized = normalizeDbmlSource(source.source, { includeRecords: plugin.settings.exportIncludeRecords });
+    const folder = source.file.parent?.path || "";
+    const baseName = source.file.basename || "schema";
+    const path = await uniquePath(plugin, normalizePath(`${folder === "/" ? "" : folder}/${baseName}.normalized.dbml`));
+    const file = await plugin.app.vault.create(path, normalized.endsWith("\n") ? normalized : `${normalized}\n`);
+    await plugin.app.workspace.getLeaf(false).openFile(file);
+    new Notice(`Normalized ${path}`);
+  } catch (error) {
+    console.error("DBML normalization failed", error);
+    new Notice(`Failed to normalize DBML: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 async function createDatabaseDiagram(plugin: DbmlPlugin, folderPath: string): Promise<void> {

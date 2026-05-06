@@ -25,6 +25,7 @@ export function createDefaultDiagramState(settings: DbmlPluginSettings): Diagram
 export class DiagramStateStore {
   private host: StateStoreHost;
   private saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private pendingSaves = new Map<string, { ref: DbmlSourceRef; state: DiagramState }>();
 
   constructor(host: StateStoreHost) {
     this.host = host;
@@ -51,8 +52,10 @@ export class DiagramStateStore {
     const key = this.storageKey(ref);
     const existing = this.saveTimers.get(key);
     if (existing) clearTimeout(existing);
+    this.pendingSaves.set(key, { ref, state });
     this.saveTimers.set(key, setTimeout(() => {
       this.saveTimers.delete(key);
+      this.pendingSaves.delete(key);
       void this.saveImmediate(ref, state);
     }, 1000));
   }
@@ -65,6 +68,7 @@ export class DiagramStateStore {
       clearTimeout(existing);
       this.saveTimers.delete(key);
     }
+    this.pendingSaves.delete(key);
     if (this.shouldUseSidecar(ref)) {
       try {
         await this.host.vault.adapter.write(this.sidecarPath(ref.filePath, ref.layoutKey), JSON.stringify(normalized, null, 2));
@@ -93,6 +97,9 @@ export class DiagramStateStore {
   async flush(): Promise<void> {
     for (const timer of this.saveTimers.values()) clearTimeout(timer);
     this.saveTimers.clear();
+    const pending = [...this.pendingSaves.values()];
+    this.pendingSaves.clear();
+    for (const { ref, state } of pending) await this.saveImmediate(ref, state);
     await this.host.savePluginData();
   }
 
@@ -114,8 +121,8 @@ export function stateKeyForFile(file: TFile): string {
   return `file:${file.path}`;
 }
 
-export function stateKeyForBlock(path: string, startLine: number, source: string): string {
-  return `block:${path}:${startLine}:${hashString(source)}`;
+export function stateKeyForBlock(path: string, startLine: number, _source: string): string {
+  return `block:${path}:${startLine}`;
 }
 
 export function parseDiagramState(raw: string): DiagramState | null {
@@ -142,15 +149,6 @@ function isDiagramState(value: unknown): value is DiagramState {
     Array.isArray(record.tableGroupCollapseStates) &&
     Array.isArray(record.stickyNoteLayouts) &&
     Array.isArray(record.referencePaths);
-}
-
-function hashString(source: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < source.length; index += 1) {
-    hash ^= source.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16);
 }
 
 function sanitizeLayoutKey(value: string): string {

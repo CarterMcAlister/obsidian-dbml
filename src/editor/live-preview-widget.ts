@@ -67,7 +67,7 @@ class DbmlWidget extends WidgetType {
     this.renderer = new RendererHost(host, this.state, (state) => {
       this.state = state;
       this.plugin.stateStore.save(this.ref(), state);
-    });
+    }, {}, { context: "live-preview", settings: this.plugin.settings });
     this.renderer.setTheme(this.plugin.currentIsDark());
     const result = parseDbml(this.source);
     this.renderer.update({ database: result.database, error: diagnosticsToMessage(result.errors) });

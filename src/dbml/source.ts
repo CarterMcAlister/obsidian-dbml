@@ -45,7 +45,7 @@ export async function resolveSourceRef(app: App, ref: DbmlSourceRef): Promise<Re
     return { file, source: text, ref };
   }
   const fences = findDbmlFences(text);
-  const fence = fences.find((candidate) => candidate.startLine === ref.blockStartLine) || fences[0];
+  const fence = fences.find((candidate) => candidate.startLine === ref.blockStartLine);
   if (!fence) return null;
   return sourceForFence(file, fence);
 }

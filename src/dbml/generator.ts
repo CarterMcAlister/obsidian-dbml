@@ -1,3 +1,6 @@
+import { Notice } from "obsidian";
+import { getDbmlCore } from "./core";
+
 export type DatabaseType = "postgres" | "mysql" | "mssql" | "snowflake";
 
 export const DATABASE_TYPES: DatabaseType[] = ["postgres", "mysql", "mssql", "snowflake"];
@@ -20,16 +23,17 @@ export async function generateDbmlFromConnection(connection: string, databaseTyp
 
 export function generateDbmlFromSchemaJson(schemaJson: unknown): string {
   try {
-    const core = require("@dbml/core") as Record<string, unknown>;
-    const exporter = core.exporter as { export?: (database: unknown, format: string) => string } | undefined;
-    const importer = core.importer as { import?: (schema: unknown, format: string) => unknown } | undefined;
-    if (importer?.import && exporter?.export) {
-      const database = importer.import(schemaJson, "schema_json");
-      const exported = exporter.export(database, "dbml");
-      if (typeof exported === "string" && exported.trim()) return exported;
-    }
-  } catch {}
+    const generated = getDbmlCore().generateDbmlFromSchemaJson(schemaJson);
+    if (typeof generated === "string" && generated.trim()) return generated;
+  } catch (error) {
+    console.warn("DBML: @dbml/core importer.generateDbml failed; using manual fallback", error);
+    if (isDevelopmentBuild()) new Notice("DBML core schema generation failed; using limited manual fallback. Check developer console for details.");
+  }
   return manualSchemaJsonToDbml(schemaJson);
+}
+
+function isDevelopmentBuild(): boolean {
+  return typeof process === "undefined" || process.env?.NODE_ENV !== "production";
 }
 
 function manualSchemaJsonToDbml(schemaJson: unknown): string {

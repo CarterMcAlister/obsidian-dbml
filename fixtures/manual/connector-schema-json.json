@@ -1,0 +1,45 @@
+{
+  "schemas": [
+    {
+      "name": "public",
+      "tables": [
+        {
+          "name": "users",
+          "comment": "Application users",
+          "columns": [
+            { "name": "id", "type": "int", "primaryKey": true, "notNull": true, "autoIncrement": true, "comment": "User id" },
+            { "name": "email", "type": "varchar", "unique": true, "notNull": true },
+            { "name": "status", "type": "user_status", "default": "active" },
+            { "name": "created_at", "type": "timestamp", "notNull": true }
+          ],
+          "indexes": [
+            { "name": "idx_users_email", "columns": ["email"], "unique": true }
+          ],
+          "checks": [
+            { "name": "users_email_check", "expression": "email <> ''" }
+          ]
+        },
+        {
+          "name": "posts",
+          "comment": "Posts written by users",
+          "columns": [
+            { "name": "id", "type": "int", "primaryKey": true },
+            { "name": "user_id", "type": "int", "notNull": true },
+            { "name": "title", "type": "varchar", "notNull": true },
+            { "name": "body", "type": "text" }
+          ]
+        }
+      ],
+      "enums": [
+        { "name": "user_status", "values": ["active", "disabled"] }
+      ]
+    }
+  ],
+  "refs": [
+    {
+      "from": { "schemaName": "public", "tableName": "posts", "fieldNames": ["user_id"] },
+      "to": { "schemaName": "public", "tableName": "users", "fieldNames": ["id"] },
+      "onDelete": "cascade"
+    }
+  ]
+}

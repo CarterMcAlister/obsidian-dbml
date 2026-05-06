@@ -5,3 +5,6 @@ main.js
 .DS_Store
 .tmp-vsix/
 scripts/
+reference/
+TECHNICAL_SPEC.md
+plans/

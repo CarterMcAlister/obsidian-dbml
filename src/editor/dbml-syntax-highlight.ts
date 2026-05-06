@@ -4,16 +4,16 @@ import type DbmlPlugin from "../main";
 import { findDbmlFences } from "../dbml/source";
 
 const BLOCK_KEYWORDS = new Set([
-  "project", "tablegroup", "table", "enum", "ref", "note", "tablepartial", "records", "diagramview"
+  "project", "tablegroup", "table", "enum", "ref", "note", "notes", "tablepartial", "records", "tabledata", "diagramview", "schema", "schemas", "check", "checks"
 ]);
 
 const SETTING_KEYWORDS = new Set([
-  "indexes", "headercolor", "pk", "null", "increment", "unique", "default", "primary", "key", "name", "as", "color",
-  "not", "tablegroups", "tables", "database_type"
+  "indexes", "index", "headercolor", "pk", "null", "increment", "unique", "default", "primary", "key", "name", "as", "color",
+  "not", "tablegroups", "tables", "database_type", "note", "delete", "update", "on", "cascade", "restrict", "no", "action", "set"
 ]);
 
 const TYPES = new Set([
-  "tinyint", "smallint", "mediumint", "int", "bigint", "float", "double", "decimal", "dec", "bit", "bool", "boolean",
+  "tinyint", "smallint", "mediumint", "int", "integer", "bigint", "float", "double", "decimal", "dec", "bit", "bool", "boolean",
   "real", "money", "binary_float", "binary_double", "smallmoney", "char", "binary", "varchar", "varbinary", "tinyblob",
   "tinytext", "blob", "text", "mediumblob", "mediumtext", "longblob", "longtext", "set", "inet6", "uuid", "nvarchar",
   "nchar", "ntext", "image", "varchar2", "nvarchar2", "date", "time", "datetime", "datetime2", "timestamp", "year",

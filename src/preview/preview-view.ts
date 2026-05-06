@@ -1,10 +1,11 @@
 import { ItemView, Notice, TFile, WorkspaceLeaf } from "obsidian";
 import type DbmlPlugin from "../main";
-import { applyDiagramView, DiagramViewDefinition, parseDiagramViews } from "../dbml/diagram-views";
+import { addDiagramViewInSource, applyDiagramView, DiagramViewDefinition, parseDiagramViews, removeDiagramViewInSource, removeStickyNoteFromDiagramViews, renameDiagramViewInSource, resetDiagramViewInSource, updateDiagramViewFilterInSource } from "../dbml/diagram-views";
+import { normalizeDbmlSource } from "../dbml/export";
 import { diagnosticsToMessage, parseDbml } from "../dbml/parser";
 import { resolveSourceRef } from "../dbml/source";
-import { findTableByRendererId, findTableGroupByRendererId, renameTableInSource, replaceSourceForRef, setTableGroupColorInSource, setTableHeaderColorInSource } from "../dbml/source-edits";
-import type { DbmlSourceRef, DiagramState, ResolvedDbmlSource } from "../dbml/types";
+import { createRefInSource, createStickyNoteInSource, findRefByRendererId, findTableByRendererId, findTableGroupByRendererId, removeStickyNoteFromSource, renameTableByNameInSource, renameTableInSource, replaceSourceForRef, setRefColorInSource, setTableGroupColorInSource, setTableHeaderColorInSource, sourceMatchesRef, updateElementNoteInSource, updateRecordsInSource, updateStickyNoteInSource } from "../dbml/source-edits";
+import type { DbmlSourceRef, DiagramState, RendererFilterConfig, ResolvedDbmlSource } from "../dbml/types";
 import { RendererHost } from "./renderer-host";
 
 export const VIEW_TYPE_DBML_PREVIEW = "dbml-preview";
@@ -110,39 +111,221 @@ export class DbmlPreviewView extends ItemView {
       error: this.latestError,
       views: Object.fromEntries(this.diagramViews.map((view) => [view.name, view.name])),
       selectedViewId: this.selectedDiagramViewName,
-      filterConfig: { tables: [], schemas: [], tableGroups: [], stickyNotes: [] }
+      defaultViewName: "All",
+      filterConfig: selectedView ? viewToFilterConfig(selectedView, this.latestDatabase) : { tables: [], schemas: [], tableGroups: [], stickyNotes: [] },
+      isFilterConfigDirty: false
     });
   }
 
   private async handleTableRenamed(args: unknown[]): Promise<void> {
-    if (!this.source || !this.latestDatabase) return;
-    const table = findTableByRendererId(this.latestDatabase, args[0]);
     const newName = typeof args[1] === "string" ? args[1] : "";
-    if (!table || !newName.trim()) return;
-    const patch = renameTableInSource(this.source.source, this.latestDatabase, table, newName);
-    if (patch.changed) await this.writeUpdatedSource(patch.source);
+    if (!newName.trim()) return;
+    const changed = await this.applySourcePatch("rename table", (source, database) => {
+      if (typeof args[0] === "string" && typeof args[2] === "string") {
+        return renameTableByNameInSource(source, args[0], newName, args[2], typeof args[3] === "string" ? args[3] : args[2]);
+      }
+      const table = findTableByRendererId(database, args[0]);
+      return table ? renameTableInSource(source, database, table, newName) : { source, changed: false };
+    });
+    if (changed) this.reparseDiagramViewsFromCurrentSource();
   }
 
   private async handleColorPicked(args: unknown[]): Promise<void> {
-    if (!this.source || !this.latestDatabase) return;
     const [type, id, color] = args;
     if (typeof type !== "string" || typeof color !== "string") return;
-    const patch = type === "table"
-      ? setTableHeaderColorInSource(this.source.source, this.latestDatabase, findTableByRendererId(this.latestDatabase, id) || {}, color)
-      : type === "table-group"
-        ? setTableGroupColorInSource(this.source.source, findTableGroupByRendererId(this.latestDatabase, id) || {}, color)
-        : null;
-    if (patch?.changed) await this.writeUpdatedSource(patch.source);
+    await this.applySourcePatch("set color", (source, database) => {
+      if (type === "table") return setTableHeaderColorInSource(source, database, findTableByRendererId(database, id) || {}, color);
+      if (type === "table-group") return setTableGroupColorInSource(source, findTableGroupByRendererId(database, id) || {}, color);
+      if (type === "ref") return setRefColorInSource(source, database, findRefByRendererId(database, id) || {}, color);
+      return { source, changed: false };
+    });
   }
 
-  private async writeUpdatedSource(nextSource: string): Promise<void> {
-    if (!this.source || !this.sourceRef) return;
+  private async handleRefCreated(args: unknown[]): Promise<void> {
+    await this.applySourcePatch("create ref", (source, database) => createRefInSource(source, database, args));
+  }
+
+  private async handleNoteUpdated(payload: unknown): Promise<void> {
+    await this.applySourcePatch("update note", (source, database) => updateElementNoteInSource(source, database, payload));
+  }
+
+  private async handleStickyNoteCreated(payload: unknown): Promise<void> {
+    await this.persistStickyNoteLayoutFromPayload(payload);
+    const noteName = stickyNoteNameFromPayload(payload);
+    const changed = await this.applySourcePatch("create sticky note", (source) => {
+      const created = createStickyNoteInSource(source, payload);
+      if (!created.changed || !this.selectedDiagramViewName || !noteName) return created;
+      const selectedView = this.diagramViews.find((view) => view.name === this.selectedDiagramViewName) || null;
+      if (!selectedView || selectedView.all || (Array.isArray(selectedView.stickyNoteNames) && selectedView.stickyNoteNames.length === 0)) return created;
+      const filterConfig = appendStickyNoteToFilterConfig(viewToFilterConfig(selectedView, this.latestDatabase), noteName);
+      return updateDiagramViewFilterInSource(created.source, selectedView.name, filterConfig);
+    });
+    if (changed) this.reparseDiagramViewsFromCurrentSource();
+  }
+
+  private async handleStickyNoteEdited(args: unknown[]): Promise<void> {
+    await this.applySourcePatch("edit sticky note", (source) => updateStickyNoteInSource(source, { name: args[0], content: args[1] }));
+  }
+
+  private async handleStickyNoteRemoved(payload: unknown): Promise<void> {
+    await this.removeStickyNoteLayoutFromPayload(payload);
+    const noteName = stickyNoteNameFromPayload(payload);
+    const changed = await this.applySourcePatch("remove sticky note", (source) => {
+      const removed = removeStickyNoteFromSource(source, payload);
+      if (!removed.changed || !noteName) return removed;
+      const updatedViews = removeStickyNoteFromDiagramViews(removed.source, noteName);
+      return { source: updatedViews.source, changed: true };
+    });
+    if (changed) this.reparseDiagramViewsFromCurrentSource();
+  }
+
+  private async handleEditDataSample(payload: unknown): Promise<void> {
+    await this.applySourcePatch("edit Records", (source, database) => updateRecordsInSource(source, database, payload));
+  }
+
+  private async handleFilterChangeRequested(payload: unknown): Promise<void> {
+    if (!this.selectedDiagramViewName) return;
+    await this.applySourcePatch("update DiagramView filter", (source) => updateDiagramViewFilterInSource(source, this.selectedDiagramViewName || "", normalizeFilterConfig(payload)));
+  }
+
+  private async handleViewAdded(name: string): Promise<void> {
+    const changed = await this.applySourcePatch("add DiagramView", (source) => addDiagramViewInSource(source, name));
+    if (changed) this.reparseDiagramViewsFromCurrentSource();
+    await this.switchDiagramView(name);
+  }
+
+  private async handleViewRenamed(oldId: string, newName: string): Promise<void> {
+    const oldName = oldId || this.selectedDiagramViewName || "";
+    const renamedSelectedView = this.selectedDiagramViewName === oldName;
+    const stateToCarry = renamedSelectedView ? this.state : null;
+    const changed = await this.applySourcePatch("rename DiagramView", (source) => renameDiagramViewInSource(source, oldName, newName));
+    if (changed) this.reparseDiagramViewsFromCurrentSource();
+    if (renamedSelectedView && stateToCarry) {
+      this.selectedDiagramViewName = newName;
+      const nextRef = this.currentStateRef();
+      if (nextRef) await this.plugin.stateStore.saveImmediate(nextRef, stateToCarry);
+      this.state = stateToCarry;
+      this.renderer?.loadState(stateToCarry);
+      this.sendCurrentDatabaseToRenderer();
+      this.renderToolbar();
+      return;
+    }
+    await this.switchDiagramView(newName);
+  }
+
+  private async handleViewRemoved(viewId: string): Promise<void> {
+    const changed = await this.applySourcePatch("remove DiagramView", (source) => removeDiagramViewInSource(source, viewId || this.selectedDiagramViewName || ""));
+    if (changed) this.reparseDiagramViewsFromCurrentSource();
+    await this.switchDiagramView(null);
+  }
+
+  private async handleViewReset(): Promise<void> {
+    if (!this.selectedDiagramViewName) return;
+    const changed = await this.applySourcePatch("reset DiagramView", (source) => resetDiagramViewInSource(source, this.selectedDiagramViewName || ""));
+    if (changed) this.reparseDiagramViewsFromCurrentSource();
+  }
+
+  private async persistStickyNoteLayoutFromPayload(payload: unknown): Promise<void> {
+    const layout = stickyNoteLayoutFromPayload(payload);
+    if (!layout || !this.state) return;
+    this.state = {
+      ...this.state,
+      stickyNoteLayouts: [
+        ...this.state.stickyNoteLayouts.filter((item) => asRecord(item).name !== layout.name),
+        layout
+      ]
+    };
+    const ref = this.currentStateRef();
+    if (ref) await this.plugin.stateStore.saveImmediate(ref, this.state);
+    this.renderer?.loadState(this.state);
+  }
+
+  private async removeStickyNoteLayoutFromPayload(payload: unknown): Promise<void> {
+    const name = stringValue(asRecord(payload).name || payload);
+    if (!name || !this.state) return;
+    this.state = {
+      ...this.state,
+      stickyNoteLayouts: this.state.stickyNoteLayouts.filter((item) => asRecord(item).name !== name)
+    };
+    const ref = this.currentStateRef();
+    if (ref) await this.plugin.stateStore.saveImmediate(ref, this.state);
+    this.renderer?.loadState(this.state);
+  }
+
+  private reparseDiagramViewsFromCurrentSource(): void {
+    if (!this.source) return;
+    this.diagramViews = parseDiagramViews(this.source.source);
+  }
+
+  private handleFocusEditor(): void {
+    if (!this.source?.file) return;
+    void this.app.workspace.getLeaf(false).openFile(this.source.file);
+  }
+
+  private async applySourcePatch(operationName: string, patcher: (currentSource: string, currentDatabase: unknown) => { source: string; changed: boolean }): Promise<boolean> {
+    if (!this.source || !this.sourceRef) return false;
     const file = this.source.file;
-    const currentFileText = await this.app.vault.read(file);
-    const nextFileText = replaceSourceForRef(currentFileText, this.sourceRef, nextSource);
-    if (nextFileText === null || nextFileText === currentFileText) return;
-    this.source = { ...this.source, source: nextSource };
-    await this.app.vault.modify(file, nextFileText);
+    try {
+      const resolved = await resolveSourceRef(this.app, this.sourceRef);
+      if (!resolved) {
+        new Notice(`Cannot ${operationName}: DBML source no longer exists.`);
+        return false;
+      }
+      const parsed = parseDbml(resolved.source);
+      if (!parsed.database) {
+        new Notice(`Cannot ${operationName}: fix DBML parse errors first.`);
+        return false;
+      }
+      const patch = patcher(resolved.source, parsed.database);
+      if (!patch.changed || patch.source === resolved.source) {
+        new Notice(`Cannot ${operationName}: no safe source change was found.`);
+        return false;
+      }
+      const validation = parseDbml(patch.source);
+      if (!validation.database) {
+        new Notice(`Cannot ${operationName}: generated DBML did not parse. Source left unchanged.`);
+        await this.offerNormalizedRecovery(operationName, resolved.source);
+        return false;
+      }
+      const currentFileText = await this.app.vault.read(file);
+      if (!sourceMatchesRef(currentFileText, resolved.ref, resolved.source)) {
+        new Notice(`Cannot ${operationName}: source changed before the patch could be applied.`);
+        return false;
+      }
+      const nextFileText = replaceSourceForRef(currentFileText, resolved.ref, patch.source);
+      if (nextFileText === null || nextFileText === currentFileText) {
+        new Notice(`Cannot ${operationName}: source location changed before the patch could be applied.`);
+        return false;
+      }
+      const stateRef = this.currentStateRef();
+      if (this.state && stateRef) await this.plugin.stateStore.saveImmediate(stateRef, this.state);
+      this.source = { ...resolved, source: patch.source };
+      this.sourceRef = resolved.ref;
+      await this.app.vault.modify(file, nextFileText);
+      return true;
+    } catch (error) {
+      console.error(`DBML: failed to ${operationName}`, error);
+      new Notice(`Failed to ${operationName}: ${error instanceof Error ? error.message : String(error)}`);
+      if (this.source) await this.offerNormalizedRecovery(operationName, this.source.source);
+      return false;
+    }
+  }
+
+  private async offerNormalizedRecovery(operationName: string, source: string): Promise<void> {
+    if (!this.source) return;
+    if (!window.confirm(`DBML could not safely ${operationName}. Create a normalized DBML recovery file instead?`)) return;
+    try {
+      const normalized = normalizeDbmlSource(source, { includeRecords: this.plugin.settings.exportIncludeRecords });
+      const folder = this.source.file.parent?.path || "";
+      const base = this.source.file.basename || "schema";
+      const path = await uniqueVaultPath(this.app.vault, `${folder === "/" ? "" : `${folder}/`}${base}.recovered.dbml`);
+      const file = await this.app.vault.create(path, normalized.endsWith("\n") ? normalized : `${normalized}\n`);
+      await this.app.workspace.getLeaf(false).openFile(file);
+      new Notice(`Created recovery file ${path}`);
+    } catch (error) {
+      console.error("DBML: failed to create recovery file", error);
+      new Notice(`Failed to create recovery file: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private scheduleRefresh(): void {
@@ -174,8 +357,20 @@ export class DbmlPreviewView extends ItemView {
       }, {
         onTableRenamed: (args) => void this.handleTableRenamed(args),
         onColorPicked: (args) => void this.handleColorPicked(args),
-        onSelectDiagramView: (viewId) => void this.switchDiagramView(viewId)
-      });
+        onRefCreated: (args) => void this.handleRefCreated(args),
+        onNoteUpdated: (payload) => void this.handleNoteUpdated(payload),
+        onStickyNoteCreated: (payload) => void this.handleStickyNoteCreated(payload),
+        onStickyNoteEdited: (args) => void this.handleStickyNoteEdited(args),
+        onStickyNoteRemoved: (payload) => void this.handleStickyNoteRemoved(payload),
+        onEditDataSample: (payload) => void this.handleEditDataSample(payload),
+        onFilterChangeRequested: (payload) => void this.handleFilterChangeRequested(payload),
+        onViewAdded: (name) => void this.handleViewAdded(name),
+        onSelectDiagramView: (viewId) => void this.switchDiagramView(viewId),
+        onViewRenamed: (oldId, newName) => void this.handleViewRenamed(oldId, newName),
+        onViewRemoved: (viewId) => void this.handleViewRemoved(viewId),
+        onViewReset: () => void this.handleViewReset(),
+        onFocusEditor: () => this.handleFocusEditor()
+      }, { context: "preview", settings: this.plugin.settings });
       this.renderer.setTheme(this.plugin.currentIsDark());
     } else {
       this.renderer.loadState(this.state);
@@ -187,4 +382,128 @@ export class DbmlPreviewView extends ItemView {
     this.renderToolbar();
     if (result.errors.length > 0) new Notice(`DBML parse error: ${result.errors[0].message}`);
   }
+}
+
+function normalizeFilterConfig(value: unknown): RendererFilterConfig {
+  const record = asRecord(value);
+  return {
+    tables: normalizeFilterArray(record.tables),
+    schemas: normalizeFilterArray(record.schemas),
+    tableGroups: normalizeFilterArray(record.tableGroups),
+    stickyNotes: normalizeFilterArray(record.stickyNotes)
+  };
+}
+
+function viewToFilterConfig(view: DiagramViewDefinition, database: unknown): RendererFilterConfig {
+  return {
+    tables: view.tableNames === null ? null : view.tableNames.map((name) => tableFilterEntry(name, database)),
+    schemas: view.schemaNames === null ? null : view.schemaNames.map((name) => ({ name })),
+    tableGroups: view.tableGroupNames === null ? null : view.tableGroupNames.map((name) => ({ name })),
+    stickyNotes: view.stickyNoteNames === null ? null : view.stickyNoteNames.map((name) => ({ name }))
+  };
+}
+
+function normalizeFilterArray(value: unknown): unknown[] | null {
+  if (value === null) return null;
+  return Array.isArray(value) ? value : [];
+}
+
+function tableFilterEntry(value: string, database: unknown): { name: string; schemaName: string } {
+  const parsed = splitQualifiedName(value);
+  if (parsed.schemaName) return { name: parsed.name, schemaName: parsed.schemaName };
+  const db = asRecord(database);
+  const schemas = asRecord(db.schemas);
+  const table = Object.values(asRecord(db.tables)).map(asRecord).find((table) => normalizeName(stringValue(table.name)) === normalizeName(parsed.name));
+  const schemaName = stringValue(asRecord(schemas[String(table?.schemaId)]).name) || "public";
+  return { name: parsed.name, schemaName };
+}
+
+function appendStickyNoteToFilterConfig(filterConfig: RendererFilterConfig, noteName: string): RendererFilterConfig {
+  const existing = Array.isArray(filterConfig.stickyNotes) ? filterConfig.stickyNotes : [];
+  const stickyNotes = existing.some((note) => asRecord(note).name === noteName)
+    ? existing
+    : [...existing, { name: noteName }];
+  return { ...filterConfig, stickyNotes };
+}
+
+function stickyNoteNameFromPayload(payload: unknown): string {
+  if (typeof payload === "string" || typeof payload === "number") return String(payload);
+  const record = asRecord(payload);
+  return stringValue(record.name || record.id);
+}
+
+function stickyNoteLayoutFromPayload(payload: unknown): { name: string; x: number; y: number; width: number; height: number } | null {
+  const record = asRecord(payload);
+  const config = asRecord(record.config);
+  const name = stringValue(record.name || record.id);
+  if (!name) return null;
+  return {
+    name,
+    x: numberValue(config.x),
+    y: numberValue(config.y),
+    width: numberValue(config.width),
+    height: numberValue(config.height)
+  };
+}
+
+function splitQualifiedName(value: string): { name: string; schemaName?: string } {
+  const parts: string[] = [];
+  let quote: string | null = null;
+  let start = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    const previous = value[index - 1];
+    if (quote) {
+      if (char === quote && previous !== "\\") quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === "`") {
+      quote = char;
+      continue;
+    }
+    if (char === ".") {
+      parts.push(unquoteIdentifier(value.slice(start, index).trim()));
+      start = index + 1;
+    }
+  }
+  parts.push(unquoteIdentifier(value.slice(start).trim()));
+  const filtered = parts.filter(Boolean);
+  if (filtered.length > 1) return { schemaName: filtered.slice(0, -1).join("."), name: filtered[filtered.length - 1] };
+  return { name: filtered[0] || value };
+}
+
+function unquoteIdentifier(value: string): string {
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")) || (value.startsWith("`") && value.endsWith("`"))) {
+    return value.slice(1, -1).replace(/\\(["'`])/g, "$1");
+  }
+  return value;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
+function numberValue(value: unknown): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+async function uniqueVaultPath(vault: import("obsidian").Vault, path: string): Promise<string> {
+  if (!vault.getAbstractFileByPath(path)) return path;
+  const dot = path.lastIndexOf(".");
+  const base = dot === -1 ? path : path.slice(0, dot);
+  const ext = dot === -1 ? "" : path.slice(dot);
+  for (let index = 2; index < 1000; index += 1) {
+    const candidate = `${base} ${index}${ext}`;
+    if (!vault.getAbstractFileByPath(candidate)) return candidate;
+  }
+  throw new Error("Could not create a unique recovery file name.");
 }

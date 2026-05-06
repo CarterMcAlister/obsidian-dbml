@@ -26,7 +26,10 @@ function diagnosticsForSource(view: EditorView, source: string, lineOffset: numb
     const endLine = Math.max(startLine, error.location.end.line + lineOffset);
     const from = positionToOffset(view, startLine, error.location.start.column);
     const to = Math.max(from + 1, positionToOffset(view, endLine, error.location.end.column));
-    return { from, to, severity: "error", message: error.message, source: "DBML" };
+    const suffix = error.code ? ` [${error.code}]` : "";
+    const details = [error.filepath, error.stack && typeof error.stack === "string" ? error.stack.split("\n")[0] : undefined].filter(Boolean).join(" — ");
+    const message = `${error.message}${suffix}${details ? `\n${details}` : ""}`;
+    return { from, to, severity: error.type || "error", message, source: "DBML" };
   });
 }
 
