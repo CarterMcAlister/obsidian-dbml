@@ -1,7 +1,7 @@
 {
   "name": "obsidian-dbml",
-  "version": "1.0.0",
-  "description": "DBML authoring, validation, generation, and diagram preview for Obsidian.",
+  "version": "1.0.1",
+  "description": "DBML authoring, validation, generation, and diagram preview.",
   "main": "dist/main.js",
   "packageManager": "bun@1.3.11",
   "scripts": {

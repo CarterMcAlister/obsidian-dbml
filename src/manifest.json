@@ -1,9 +1,9 @@
 {
-  "id": "obsidian-dbml",
+  "id": "dbml",
   "name": "DBML",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.5.0",
-  "description": "DBML authoring, validation, generation, and diagram preview for Obsidian.",
+  "description": "DBML authoring, validation, generation, and diagram preview.",
   "author": "CarterMcAlister",
   "authorUrl": "https://github.com/CarterMcAlister",
   "isDesktopOnly": true

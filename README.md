@@ -1,7 +1,7 @@
 
 # Obsidian DBML
 
-DBML authoring, validation, generation, and diagram preview for Obsidian.
+DBML authoring, validation, generation, and diagram preview.
 
 <img width="2096" height="1428" alt="dbml-screenshot" src="https://github.com/user-attachments/assets/2962fe29-7daf-49b3-b1d7-eb80e4aea00d" />
 
@@ -29,19 +29,19 @@ bun run build
 Create a tag that matches `package.json` and `src/manifest.json`, then push it to GitHub:
 
 ```bash
-git tag 1.0.0
-git push origin 1.0.0
+git tag 1.0.1
+git push origin 1.0.1
 ```
 
 The release workflow builds the plugin and uploads `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` to the GitHub release.
 
 ## Local Install
 
-Copy the build output into a vault plugin folder such as `.obsidian/plugins/obsidian-dbml/`:
+Copy the build output into a vault plugin folder such as `.obsidian/plugins/dbml/`:
 
 ```bash
-mkdir -p /path/to/Vault/.obsidian/plugins/obsidian-dbml
-cp dist/main.js dist/manifest.json dist/styles.css /path/to/Vault/.obsidian/plugins/obsidian-dbml/
+mkdir -p /path/to/Vault/.obsidian/plugins/dbml
+cp dist/main.js dist/manifest.json dist/styles.css /path/to/Vault/.obsidian/plugins/dbml/
 ```
 
 Then reload Obsidian and enable the plugin.
