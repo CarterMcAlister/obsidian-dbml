@@ -4,6 +4,7 @@ import { DBML_EXPORT_FORMATS, exportDbmlSource, extensionForExportFormat, labelF
 import { resolveActiveDbmlSource } from "../dbml/source";
 import type { ResolvedDbmlSource } from "../dbml/types";
 import type DbmlPlugin from "../main";
+import { confirmWithModal } from "./confirm-modal";
 
 export class ExportDbmlModal extends Modal {
   private format: DbmlExportFormat;
@@ -19,11 +20,15 @@ export class ExportDbmlModal extends Modal {
     this.normalizedJson = plugin.settings.exportJsonNormalized;
   }
 
-  async onOpen(): Promise<void> {
+  onOpen(): void {
+    void this.load();
+  }
+
+  private async load(): Promise<void> {
     this.source = await resolveActiveDbmlSource(this.app);
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Export active DBML as SQL/JSON/normalized DBML" });
+    this.setTitle("Export active source");
     if (!this.source) {
       contentEl.createEl("p", { text: "Open a .dbml file or place the cursor inside a fenced dbml block first." });
       new Setting(contentEl).addButton((button) => button.setButtonText("Close").onClick(() => this.close()));
@@ -46,13 +51,13 @@ export class ExportDbmlModal extends Modal {
       });
 
     new Setting(contentEl)
-      .setName("Include Records")
-      .setDesc("Relevant for normalized DBML export.")
+      .setName("Include records")
+      .setDesc("Relevant for normalized dbml export.")
       .addToggle((toggle) => toggle.setValue(this.includeRecords).onChange((value) => this.includeRecords = value));
 
     new Setting(contentEl)
       .setName("Normalized JSON")
-      .setDesc("When exporting JSON, output the normalized model instead of Database.export().")
+      .setDesc("When exporting JSON, output the normalized model instead of database.export().")
       .addToggle((toggle) => toggle.setValue(this.normalizedJson).onChange((value) => {
         this.normalizedJson = value;
         this.outputName = defaultOutputName(this.source, this.format, { isNormalized: this.normalizedJson });
@@ -62,7 +67,7 @@ export class ExportDbmlModal extends Modal {
 
     const output = new Setting(contentEl)
       .setName("Output file name")
-      .setDesc("Saved next to the active DBML source.")
+      .setDesc("Saved next to the active dbml source.")
       .addText((text) => text.setValue(this.outputName).onChange((value) => this.outputName = value));
     output.settingEl.addClass("obsidian-dbml-export-output");
 
@@ -114,7 +119,11 @@ function sanitizeOutputName(value: string): string | null {
 async function confirmOverwrite(app: App, path: string): Promise<boolean> {
   const existing = app.vault.getAbstractFileByPath(path);
   if (!(existing instanceof TFile)) return true;
-  return window.confirm(`${path} already exists. Overwrite it?`);
+  return confirmWithModal(app, {
+    title: "Overwrite file",
+    message: `${path} already exists. Overwrite it?`,
+    confirmText: "Overwrite"
+  });
 }
 
 async function writeTextFile(app: App, path: string, content: string): Promise<TFile> {

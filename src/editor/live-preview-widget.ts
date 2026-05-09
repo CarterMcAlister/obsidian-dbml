@@ -48,11 +48,9 @@ class DbmlWidget extends WidgetType {
   }
 
   toDOM(): HTMLElement {
-    const wrapper = document.createElement("div");
-    wrapper.addClass("obsidian-dbml-live-widget");
+    const wrapper = activeDocument.createDiv({ cls: "obsidian-dbml-live-widget" });
     wrapper.style.setProperty("--obsidian-dbml-height", `${this.plugin.settings.defaultPreviewHeight}px`);
     const host = wrapper.createDiv({ cls: "obsidian-dbml-renderer-host" });
-    host.style.height = `${this.plugin.settings.defaultPreviewHeight}px`;
     void this.mount(host);
     return wrapper;
   }

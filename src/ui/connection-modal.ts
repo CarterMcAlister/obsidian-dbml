@@ -13,7 +13,7 @@ export class ConnectionModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Generate DBML from Database Connection" });
+    this.setTitle("Generate from database connection");
 
     new Setting(contentEl)
       .setName("Database type")
@@ -40,7 +40,7 @@ export class ConnectionModal extends Modal {
       .setName("Output file name")
       .setDesc("Saved as a .dbml file in the active folder or vault root.")
       .addText((text) => text
-        .setPlaceholder("my-database")
+        .setPlaceholder("Database")
         .setValue(this.outputName)
         .onChange((value) => this.outputName = value));
 
@@ -70,7 +70,7 @@ export class ConnectionModal extends Modal {
       return;
     }
     try {
-      new Notice("Generating DBML from database...");
+      new Notice("Generating from database...");
       const dbml = await generateDbmlFromConnection(connection, this.databaseType);
       const folder = this.app.workspace.getActiveFile()?.parent || this.app.vault.getRoot();
       const path = normalizePath(`${folder.path === "/" ? "" : folder.path}/${outputName.endsWith(".dbml") ? outputName : `${outputName}.dbml`}`);

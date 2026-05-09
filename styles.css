@@ -58,6 +58,15 @@
   height: var(--obsidian-dbml-height, 600px);
 }
 
+.obsidian-dbml-live-widget .obsidian-dbml-renderer-host {
+  height: var(--obsidian-dbml-height, 600px);
+}
+
+.obsidian-dbml-import-source textarea {
+  min-height: 220px;
+  min-width: 420px;
+}
+
 .obsidian-dbml-error {
   padding: 12px;
   color: var(--text-error);

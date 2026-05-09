@@ -65,19 +65,17 @@ export class DbmlSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "DBML" });
-
     new Setting(containerEl)
-      .setName("Render DBML code blocks")
-      .setDesc("Render fenced dbml blocks in Reading view.")
+      .setName("Render code blocks")
+      .setDesc("Render fenced dbml blocks in reading view.")
       .addToggle((toggle) => toggle.setValue(this.plugin.settings.renderMarkdownCodeBlocks).onChange(async (value) => {
         this.plugin.settings.renderMarkdownCodeBlocks = value;
         await this.plugin.saveSettings();
       }));
 
     new Setting(containerEl)
-      .setName("Render Live Preview widgets")
-      .setDesc("Show rendered DBML diagrams below fenced dbml blocks while editing. Disable this for very large notes.")
+      .setName("Render live preview widgets")
+      .setDesc("Show rendered diagrams below fenced dbml blocks while editing. Disable this for very large notes.")
       .addToggle((toggle) => toggle.setValue(this.plugin.settings.renderLivePreviewWidgets).onChange(async (value) => {
         this.plugin.settings.renderLivePreviewWidgets = value;
         await this.plugin.saveSettings();
@@ -86,7 +84,7 @@ export class DbmlSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Default preview height")
-      .setDesc("Height in pixels for Markdown and Live Preview diagrams.")
+      .setDesc("Height in pixels for reading view and live preview diagrams.")
       .addText((text) => text
         .setPlaceholder("600")
         .setValue(String(this.plugin.settings.defaultPreviewHeight))
@@ -136,7 +134,7 @@ export class DbmlSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("State storage")
-      .setDesc("Sidecar stores .dbdiagram files next to .dbml files. Plugin data stores everything in the plugin data file.")
+      .setDesc("Sidecar stores hidden .dbml-layout.json files next to .dbml files. Plugin data stores everything in the plugin data file.")
       .addDropdown((dropdown) => dropdown
         .addOptions({ sidecar: "Sidecar files", "plugin-data": "Plugin data" })
         .setValue(this.plugin.settings.stateStorage)
@@ -147,7 +145,7 @@ export class DbmlSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Show source below rendered blocks")
-      .setDesc("Add a collapsed source toggle below rendered Markdown DBML diagrams.")
+      .setDesc("Add a collapsed source toggle below rendered Markdown dbml diagrams.")
       .addToggle((toggle) => toggle.setValue(this.plugin.settings.showSourceBelowMarkdownPreview).onChange(async (value) => {
         this.plugin.settings.showSourceBelowMarkdownPreview = value;
         await this.plugin.saveSettings();
@@ -155,13 +153,13 @@ export class DbmlSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Database generation")
-      .setDesc("Enable Generate DBML from Database Connection. Connection strings are never saved.")
+      .setDesc("Enable database connection generation. Connection strings are never saved.")
       .addToggle((toggle) => toggle.setValue(this.plugin.settings.enableDatabaseGeneration).onChange(async (value) => {
         this.plugin.settings.enableDatabaseGeneration = value;
         await this.plugin.saveSettings();
       }));
 
-    containerEl.createEl("h3", { text: "Import/export defaults" });
+    new Setting(containerEl).setName("Import/export defaults").setHeading();
 
     new Setting(containerEl)
       .setName("Default import dialect")
@@ -184,7 +182,7 @@ export class DbmlSettingTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName("Include Records in DBML export")
+      .setName("Include records in export")
       .addToggle((toggle) => toggle.setValue(this.plugin.settings.exportIncludeRecords).onChange(async (value) => {
         this.plugin.settings.exportIncludeRecords = value;
         await this.plugin.saveSettings();
@@ -197,18 +195,18 @@ export class DbmlSettingTab extends PluginSettingTab {
         await this.plugin.saveSettings();
       }));
 
-    containerEl.createEl("h3", { text: "Advanced renderer features" });
+    new Setting(containerEl).setName("Advanced renderer features").setHeading();
 
     new Setting(containerEl)
       .setName("Visual source edits")
-      .setDesc("Allow the preview renderer to update DBML source for implemented visual actions.")
+      .setDesc("Allow the preview renderer to update dbml source for implemented visual actions.")
       .addToggle((toggle) => toggle.setValue(this.plugin.settings.visualSourceEdits).onChange(async (value) => {
         this.plugin.settings.visualSourceEdits = value;
         await this.plugin.saveSettings();
       }));
 
     new Setting(containerEl)
-      .setName("Visual edits in Markdown reading view")
+      .setName("Visual edits in reading view")
       .setDesc("Off by default so rendered Markdown blocks remain read-only.")
       .addToggle((toggle) => toggle.setValue(this.plugin.settings.visualEditsInMarkdown).onChange(async (value) => {
         this.plugin.settings.visualEditsInMarkdown = value;
@@ -216,7 +214,7 @@ export class DbmlSettingTab extends PluginSettingTab {
       }));
 
     new Setting(containerEl)
-      .setName("Visual edits in Live Preview")
+      .setName("Visual edits in live preview")
       .setDesc("Off by default for editor performance and source safety.")
       .addToggle((toggle) => toggle.setValue(this.plugin.settings.visualEditsInLivePreview).onChange(async (value) => {
         this.plugin.settings.visualEditsInLivePreview = value;
@@ -231,7 +229,7 @@ export class DbmlSettingTab extends PluginSettingTab {
       }));
 
     new Setting(containerEl)
-      .setName("Renderer DiagramViews")
+      .setName("Renderer diagram views")
       .addToggle((toggle) => toggle.setValue(this.plugin.settings.enableRendererDiagramViews).onChange(async (value) => {
         this.plugin.settings.enableRendererDiagramViews = value;
         await this.plugin.saveSettings();

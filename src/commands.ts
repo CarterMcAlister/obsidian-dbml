@@ -23,21 +23,21 @@ export function registerCommands(plugin: DbmlPlugin): void {
 
   plugin.addCommand({
     id: "open-preview-to-side",
-    name: "Open DBML preview to the side",
+    name: "Open database diagram preview to the side",
     checkCallback: (checking) => {
       const activeFile = plugin.app.workspace.getActiveFile();
       if (!activeFile || !["dbml", "md"].includes(activeFile.extension.toLowerCase())) return false;
-      if (!checking) void plugin.openPreviewForActiveSource();
+      if (!checking) void plugin.openPreviewForActiveSource(activeFile);
       return true;
     }
   });
 
   plugin.addCommand({
-    id: "generate-dbml-from-database-connection",
-    name: "Generate DBML from Database Connection",
+    id: "generate-from-database-connection",
+    name: "Generate from database connection",
     callback: () => {
       if (!plugin.settings.enableDatabaseGeneration) {
-        new Notice("Database generation is disabled in DBML settings.");
+        new Notice("Database generation is disabled in settings.");
         return;
       }
       new ConnectionModal(plugin.app).open();
@@ -45,26 +45,26 @@ export function registerCommands(plugin: DbmlPlugin): void {
   });
 
   plugin.addCommand({
-    id: "import-dbml-from-sql-schemarb-json",
-    name: "Import DBML from SQL/SchemaRb/JSON",
+    id: "import-from-sql-schemarb-json",
+    name: "Import from SQL, schema.rb, or JSON",
     callback: () => new ImportDbmlModal(plugin).open()
   });
 
   plugin.addCommand({
-    id: "export-active-dbml",
-    name: "Export active DBML as SQL/JSON/normalized DBML",
+    id: "export-active-source",
+    name: "Export active source",
     callback: () => new ExportDbmlModal(plugin).open()
   });
 
   plugin.addCommand({
-    id: "normalize-active-dbml",
-    name: "Normalize/format active DBML into a new file",
+    id: "normalize-active-source",
+    name: "Normalize active source into a new file",
     callback: () => void normalizeActiveDbml(plugin)
   });
 
   plugin.addCommand({
-    id: "reset-dbml-diagram-state",
-    name: "Reset DBML diagram state",
+    id: "reset-diagram-state",
+    name: "Reset diagram state",
     callback: async () => {
       const source = await resolveActiveDbmlSource(plugin.app);
       if (!source) {
@@ -72,7 +72,7 @@ export function registerCommands(plugin: DbmlPlugin): void {
         return;
       }
       await plugin.stateStore.delete(source.ref);
-      new Notice("DBML diagram state reset.");
+      new Notice("Diagram state reset.");
     }
   });
 }
@@ -87,7 +87,7 @@ async function normalizeActiveDbml(plugin: DbmlPlugin): Promise<void> {
     const normalized = normalizeDbmlSource(source.source, { includeRecords: plugin.settings.exportIncludeRecords });
     const folder = source.file.parent?.path || "";
     const baseName = source.file.basename || "schema";
-    const path = await uniquePath(plugin, normalizePath(`${folder === "/" ? "" : folder}/${baseName}.normalized.dbml`));
+    const path = uniquePath(plugin, normalizePath(`${folder === "/" ? "" : folder}/${baseName}.normalized.dbml`));
     const file = await plugin.app.vault.create(path, normalized.endsWith("\n") ? normalized : `${normalized}\n`);
     await plugin.app.workspace.getLeaf(false).openFile(file);
     new Notice(`Normalized ${path}`);
@@ -107,11 +107,10 @@ async function createDatabaseDiagram(plugin: DbmlPlugin, folderPath: string): Pr
       return;
     }
     const basePath = diagramPath(folderPath, safeName);
-    const path = await uniquePath(plugin, basePath);
+    const path = uniquePath(plugin, basePath);
     const file = await plugin.app.vault.create(path, defaultDbmlTemplate(safeName));
     const leaf = plugin.app.workspace.getLeaf(true);
     await leaf.openFile(file);
-    plugin.app.workspace.revealLeaf(leaf);
     new Notice(`Created ${path}`);
   } catch (error) {
     console.error("DBML: failed to create database diagram", error);
@@ -140,7 +139,7 @@ class NewDatabaseDiagramModal extends Modal {
       .setDesc("Creates a .dbml file in the selected folder.")
       .addText((text) => {
         text
-          .setPlaceholder("schema")
+          .setPlaceholder("Schema")
           .setValue(this.value)
           .onChange((value) => {
             this.value = value;
@@ -150,7 +149,7 @@ class NewDatabaseDiagramModal extends Modal {
           event.preventDefault();
           this.submit();
         });
-        window.setTimeout(() => {
+        activeWindow.setTimeout(() => {
           text.inputEl.focus();
           text.inputEl.select();
         });
@@ -183,7 +182,7 @@ class NewDatabaseDiagramModal extends Modal {
   }
 }
 
-async function uniquePath(plugin: DbmlPlugin, path: string): Promise<string> {
+function uniquePath(plugin: DbmlPlugin, path: string): string {
   if (!plugin.app.vault.getAbstractFileByPath(path)) return path;
   const withoutExt = path.replace(/\.dbml$/i, "");
   for (let index = 2; index < 1000; index += 1) {

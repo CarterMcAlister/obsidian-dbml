@@ -11,30 +11,71 @@ interface CodeFence {
 
 export async function resolveActiveDbmlSource(app: App): Promise<ResolvedDbmlSource | null> {
   const view = app.workspace.getActiveViewOfType(MarkdownView);
-  const file = view?.file;
-  if (!view || !file) return null;
+  const activeViewSource = view ? await sourceForMarkdownView(app, view, true) : null;
+  if (activeViewSource) return activeViewSource;
+
+  const activeFile = app.workspace.getActiveFile();
+  const activeFileSource = activeFile ? await sourceForFile(app, activeFile) : null;
+  if (activeFileSource) return activeFileSource;
+
+  const mostRecentLeaf = app.workspace.getMostRecentLeaf();
+  if (mostRecentLeaf?.view instanceof MarkdownView) {
+    const recentSource = await sourceForMarkdownView(app, mostRecentLeaf.view, false);
+    if (recentSource) return recentSource;
+  }
+
+  for (const leaf of app.workspace.getLeavesOfType("markdown")) {
+    if (leaf.view instanceof MarkdownView) {
+      const leafSource = await sourceForMarkdownView(app, leaf.view, false);
+      if (leafSource) return leafSource;
+    }
+  }
+
+  return null;
+}
+
+async function sourceForMarkdownView(app: App, view: MarkdownView, allowCursorSelection: boolean): Promise<ResolvedDbmlSource | null> {
+  const file = view.file;
+  if (!file) return null;
   if (file.extension.toLowerCase() === "dbml") {
-    const source = await app.vault.read(file);
-    return {
-      file,
-      source,
-      ref: {
-        kind: "file",
-        filePath: file.path,
-        sourceKey: stateKeyForFile(file),
-        displayName: file.path
-      }
-    };
+    return sourceForDbmlFile(app, file);
   }
   if (file.extension.toLowerCase() !== "md") return null;
   const editor = view.editor;
   const text = editor.getValue();
   const fences = findDbmlFences(text);
   if (fences.length === 0) return null;
-  const cursorLine = editor.getCursor().line;
-  const selected = fences.find((fence) => cursorLine >= fence.startLine && cursorLine <= fence.endLine) || (fences.length === 1 ? fences[0] : null);
+  const selected = allowCursorSelection
+    ? fences.find((fence) => editor.getCursor().line >= fence.startLine && editor.getCursor().line <= fence.endLine) || (fences.length === 1 ? fences[0] : null)
+    : fences.length === 1 ? fences[0] : null;
   if (!selected) return null;
   return sourceForFence(file, selected);
+}
+
+async function sourceForFile(app: App, file: TFile): Promise<ResolvedDbmlSource | null> {
+  if (file.extension.toLowerCase() === "dbml") return sourceForDbmlFile(app, file);
+  if (file.extension.toLowerCase() !== "md") return null;
+  const text = await app.vault.read(file);
+  const fences = findDbmlFences(text);
+  return fences.length === 1 ? sourceForFence(file, fences[0]) : null;
+}
+
+export async function resolveDbmlSourceForFile(app: App, file: TFile): Promise<ResolvedDbmlSource | null> {
+  return sourceForFile(app, file);
+}
+
+async function sourceForDbmlFile(app: App, file: TFile): Promise<ResolvedDbmlSource> {
+  const source = await app.vault.read(file);
+  return {
+    file,
+    source,
+    ref: {
+      kind: "file",
+      filePath: file.path,
+      sourceKey: stateKeyForFile(file),
+      displayName: file.path
+    }
+  };
 }
 
 export async function resolveSourceRef(app: App, ref: DbmlSourceRef): Promise<ResolvedDbmlSource | null> {

@@ -24,7 +24,7 @@ export function createDefaultDiagramState(settings: DbmlPluginSettings): Diagram
 
 export class DiagramStateStore {
   private host: StateStoreHost;
-  private saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private saveTimers = new Map<string, number>();
   private pendingSaves = new Map<string, { ref: DbmlSourceRef; state: DiagramState }>();
 
   constructor(host: StateStoreHost) {
@@ -51,9 +51,9 @@ export class DiagramStateStore {
   save(ref: DbmlSourceRef, state: DiagramState): void {
     const key = this.storageKey(ref);
     const existing = this.saveTimers.get(key);
-    if (existing) clearTimeout(existing);
+    if (existing) activeWindow.clearTimeout(existing);
     this.pendingSaves.set(key, { ref, state });
-    this.saveTimers.set(key, setTimeout(() => {
+    this.saveTimers.set(key, activeWindow.setTimeout(() => {
       this.saveTimers.delete(key);
       this.pendingSaves.delete(key);
       void this.saveImmediate(ref, state);
@@ -65,7 +65,7 @@ export class DiagramStateStore {
     const key = this.storageKey(ref);
     const existing = this.saveTimers.get(key);
     if (existing) {
-      clearTimeout(existing);
+      activeWindow.clearTimeout(existing);
       this.saveTimers.delete(key);
     }
     this.pendingSaves.delete(key);
@@ -84,7 +84,7 @@ export class DiagramStateStore {
   async delete(ref: DbmlSourceRef): Promise<void> {
     const key = this.storageKey(ref);
     const timer = this.saveTimers.get(key);
-    if (timer) clearTimeout(timer);
+    if (timer) activeWindow.clearTimeout(timer);
     this.saveTimers.delete(key);
     delete this.host.states[key];
     if (this.shouldUseSidecar(ref)) {
@@ -95,7 +95,7 @@ export class DiagramStateStore {
   }
 
   async flush(): Promise<void> {
-    for (const timer of this.saveTimers.values()) clearTimeout(timer);
+    for (const timer of this.saveTimers.values()) activeWindow.clearTimeout(timer);
     this.saveTimers.clear();
     const pending = [...this.pendingSaves.values()];
     this.pendingSaves.clear();
@@ -113,8 +113,12 @@ export class DiagramStateStore {
 
   private sidecarPath(filePath: string, layoutKey?: string): string {
     const suffix = layoutKey ? `.${sanitizeLayoutKey(layoutKey)}` : "";
-    return normalizePath(filePath.replace(/\.dbml$/i, `${suffix}.dbdiagram`));
+    const slash = filePath.lastIndexOf("/");
+    const folder = slash === -1 ? "" : `${filePath.slice(0, slash + 1)}`;
+    const fileName = slash === -1 ? filePath : filePath.slice(slash + 1);
+    return normalizePath(`${folder}.${fileName.replace(/\.dbml$/i, `${suffix}.dbml-layout.json`)}`);
   }
+
 }
 
 export function stateKeyForFile(file: TFile): string {

@@ -21,7 +21,7 @@ const TYPES = new Set([
   "json", "jsonb", "serial", "bigserial", "uuid"
 ]);
 
-const TOKEN_PATTERN = /\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*|'''[\s\S]*?(?:'''|$)|"(?:\\.|[^"\\])*(?:"|$)|'(?:\\.|[^'\\])*(?:'|$)|`(?:\\.|[^`\\])*(?:`|$)|0[xX][0-9a-fA-F]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?|#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?|-?\b[A-Za-z_][\w.]*\b|[{}\[\]()]|[,.:]|[<>-]/g;
+const TOKEN_PATTERN = /\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*|'''[\s\S]*?(?:'''|$)|"(?:\\.|[^"\\])*(?:"|$)|'(?:\\.|[^'\\])*(?:'|$)|`(?:\\.|[^`\\])*(?:`|$)|0[xX][0-9a-fA-F]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?|#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?|-?\b[A-Za-z_][\w.]*\b|[{}[\]()]|[,.:]|[<>-]/g;
 
 export function createDbmlSyntaxHighlightExtension(plugin: DbmlPlugin) {
   return ViewPlugin.fromClass(class {
@@ -72,7 +72,7 @@ function classForToken(token: string): string | null {
   if (token.startsWith("/*") || token.startsWith("//")) return "cm-comment";
   if (token.startsWith("'''") || token.startsWith('"') || token.startsWith("'") || token.startsWith("`")) return "cm-string";
   if (/^(?:0[xX][0-9a-fA-F]+|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?|#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?)$/.test(token)) return "cm-number";
-  if (/^[{}\[\]()]$/.test(token)) return "cm-bracket";
+  if (/^[{}[\]()]$/.test(token)) return "cm-bracket";
   if (/^[,.:]$/.test(token)) return "cm-punctuation";
   if (/^[<>-]$/.test(token)) return "cm-operator";
   const normalized = token.replace(/^-/, "").toLowerCase();

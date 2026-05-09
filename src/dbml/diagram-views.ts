@@ -125,19 +125,19 @@ export function applyDiagramView(database: unknown, view: DiagramViewDefinition 
   const allTablesVisible = tableNames !== null && tableNames.size === 0 && schemaNames !== null && schemaNames.size === 0 && tableGroupNames !== null && tableGroupNames.size === 0;
 
   if (allTablesVisible) {
-    for (const table of Object.values(tables).map(asRecord)) allowedTableIds.add(String(table.id));
+    for (const table of Object.values(tables).map(asRecord)) addId(allowedTableIds, table.id);
   } else {
     for (const group of Object.values(tableGroups).map(asRecord)) {
       if (tableGroupNames && tableGroupNames.size > 0 && tableGroupNames.has(normalizeName(stringValue(group.name)))) {
-        for (const tableId of arrayValue(group.tableIds)) allowedTableIds.add(String(tableId));
+        for (const tableId of arrayValue(group.tableIds)) addId(allowedTableIds, tableId);
       }
     }
 
     for (const table of Object.values(tables).map(asRecord)) {
-      const schemaName = stringValue(asRecord(schemas[String(table.schemaId)]).name);
+      const schemaName = stringValue(asRecord(schemas[stringValue(table.schemaId)]).name);
       const name = stringValue(table.name);
       const candidates = [name, schemaName && name ? `${schemaName}.${name}` : ""].map(normalizeName);
-      if ((tableNames && candidates.some((candidate) => tableNames.has(candidate))) || (schemaNames && schemaNames.has(normalizeName(schemaName)))) allowedTableIds.add(String(table.id));
+      if ((tableNames && candidates.some((candidate) => tableNames.has(candidate))) || (schemaNames && schemaNames.has(normalizeName(schemaName)))) addId(allowedTableIds, table.id);
     }
   }
 
@@ -147,16 +147,16 @@ export function applyDiagramView(database: unknown, view: DiagramViewDefinition 
     return stickyNoteNames.has(normalizeName(name));
   });
 
-  root.tables = filterObject(tables, (table) => allowedTableIds.has(String(asRecord(table).id)));
-  root.fields = filterObject(asRecord(root.fields), (field) => allowedTableIds.has(String(asRecord(field).tableId)));
-  root.indexes = filterObject(asRecord(root.indexes), (index) => allowedTableIds.has(String(asRecord(index).tableId)) || allowedTableIds.has(String(asRecord(index).table_id)));
+  root.tables = filterObject(tables, (table) => allowedTableIds.has(stringValue(asRecord(table).id)));
+  root.fields = filterObject(asRecord(root.fields), (field) => allowedTableIds.has(stringValue(asRecord(field).tableId)));
+  root.indexes = filterObject(asRecord(root.indexes), (index) => allowedTableIds.has(stringValue(asRecord(index).tableId)) || allowedTableIds.has(stringValue(asRecord(index).table_id)));
   root.checks = filterObject(asRecord(root.checks), (check) => {
     const tableId = asRecord(check).tableId;
-    return tableId === undefined || allowedTableIds.has(String(tableId));
+    return tableId === undefined || allowedTableIds.has(stringValue(tableId));
   });
   root.records = filterObject(asRecord(root.records), (record) => {
     const tableId = asRecord(record).tableId;
-    return tableId === undefined || allowedTableIds.has(String(tableId));
+    return tableId === undefined || allowedTableIds.has(stringValue(tableId));
   });
 
   const endpoints = asRecord(root.endpoints);
@@ -166,22 +166,22 @@ export function applyDiagramView(database: unknown, view: DiagramViewDefinition 
     const tableName = stringValue(record.tableName);
     const schemaName = stringValue(record.schemaName);
     const matched = Object.values(root.tables as Record<string, unknown>).map(asRecord).some((table) => {
-      const schema = stringValue(asRecord(schemas[String(table.schemaId)]).name);
+      const schema = stringValue(asRecord(schemas[stringValue(table.schemaId)]).name);
       return normalizeName(stringValue(table.name)) === normalizeName(tableName) && (!schemaName || normalizeName(schema) === normalizeName(schemaName));
     });
-    if (matched) allowedEndpointIds.add(String(record.id));
+    if (matched) addId(allowedEndpointIds, record.id);
     return matched;
   });
 
-  root.refs = filterObject(asRecord(root.refs), (ref) => arrayValue(asRecord(ref).endpointIds).every((id) => allowedEndpointIds.has(String(id))));
-  const allowedRefIds = new Set(Object.values(asRecord(root.refs)).map((ref) => String(asRecord(ref).id)));
+  root.refs = filterObject(asRecord(root.refs), (ref) => arrayValue(asRecord(ref).endpointIds).every((id) => allowedEndpointIds.has(stringValue(id))));
+  const allowedRefIds = new Set(Object.values(asRecord(root.refs)).map((ref) => stringValue(asRecord(ref).id)).filter(Boolean));
 
   root.tableGroups = tableGroupNames === null ? {} : filterObject(tableGroups, (group) => {
     const record = asRecord(group);
     const originalTableIds = arrayValue(record.tableIds);
     const explicitGroup = tableGroupNames.size > 0 && tableGroupNames.has(normalizeName(stringValue(record.name)));
-    record.tableIds = originalTableIds.filter((id) => allowedTableIds.has(String(id)));
-    const allGroupTablesVisible = originalTableIds.length > 0 && originalTableIds.every((id) => allowedTableIds.has(String(id)));
+    record.tableIds = originalTableIds.filter((id) => allowedTableIds.has(stringValue(id)));
+    const allGroupTablesVisible = originalTableIds.length > 0 && originalTableIds.every((id) => allowedTableIds.has(stringValue(id)));
     return explicitGroup || (tableGroupNames.size === 0 && allGroupTablesVisible);
   });
 
@@ -189,10 +189,10 @@ export function applyDiagramView(database: unknown, view: DiagramViewDefinition 
     const record = asRecord(schema);
     const originalTableIds = arrayValue(record.tableIds);
     const explicitSchema = schemaNames.size > 0 && schemaNames.has(normalizeName(stringValue(record.name)));
-    record.tableIds = originalTableIds.filter((id) => allowedTableIds.has(String(id)));
-    record.refIds = arrayValue(record.refIds).filter((id) => allowedRefIds.has(String(id)));
-    record.tableGroupIds = arrayValue(record.tableGroupIds).filter((id) => Boolean((root.tableGroups as Record<string, unknown>)[String(id)]));
-    const allSchemaTablesVisible = originalTableIds.length > 0 && originalTableIds.every((id) => allowedTableIds.has(String(id)));
+    record.tableIds = originalTableIds.filter((id) => allowedTableIds.has(stringValue(id)));
+    record.refIds = arrayValue(record.refIds).filter((id) => allowedRefIds.has(stringValue(id)));
+    record.tableGroupIds = arrayValue(record.tableGroupIds).filter((id) => Boolean((root.tableGroups as Record<string, unknown>)[stringValue(id)]));
+    const allSchemaTablesVisible = originalTableIds.length > 0 && originalTableIds.every((id) => allowedTableIds.has(stringValue(id)));
     return explicitSchema || (schemaNames.size === 0 && allSchemaTablesVisible);
   });
 
@@ -469,6 +469,11 @@ function arrayValue(value: unknown): unknown[] {
 
 function stringValue(value: unknown): string {
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
+function addId(ids: Set<string>, value: unknown): void {
+  const id = stringValue(value);
+  if (id) ids.add(id);
 }
 
 function unquote(value: string): string {

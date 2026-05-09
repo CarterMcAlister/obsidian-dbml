@@ -1,12 +1,20 @@
 import esbuild from "esbuild";
 import process from "process";
-import builtins from "builtin-modules";
+import { builtinModules } from "node:module";
 import { mkdir, copyFile } from "node:fs/promises";
 
 const prod = process.argv[2] === "production";
 const watch = process.argv[2] === "--watch";
 
 const banner = `/* obsidian-dbml */`;
+
+const nodeBuiltinAliasPlugin = {
+  name: "node-builtin-aliases",
+  setup(build) {
+    build.onResolve({ filter: /^process\/$/ }, () => ({ path: "process", external: true }));
+    build.onResolve({ filter: /^string_decoder\/$/ }, () => ({ path: "string_decoder", external: true }));
+  }
+};
 
 await mkdir("dist", { recursive: true });
 
@@ -27,8 +35,8 @@ const context = await esbuild.context({
     "@codemirror/view",
     "@lezer/common",
     "@lezer/highlight",
-    ...builtins,
-    ...builtins.map((module) => `node:${module}`)
+    ...builtinModules,
+    ...builtinModules.map((module) => `node:${module}`)
   ],
   format: "cjs",
   target: "es2022",
@@ -37,6 +45,7 @@ const context = await esbuild.context({
   treeShaking: true,
   outfile: "dist/main.js",
   minify: prod,
+  plugins: [nodeBuiltinAliasPlugin],
   loader: {
     ".html": "text",
     ".css": "text",

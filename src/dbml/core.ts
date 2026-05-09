@@ -1,3 +1,5 @@
+import * as dbmlCoreModule from "@dbml/core";
+
 export type DbmlImportFormat = "dbml" | "mysql" | "postgres" | "json" | "mssql" | "postgresLegacy" | "mssqlLegacy" | "schemarb" | "snowflake" | "oracle";
 export type DbmlExportFormat = "dbml" | "mysql" | "postgres" | "json" | "mssql" | "oracle";
 export type DbmlParseFormat = DbmlImportFormat | "dbmlv2";
@@ -25,7 +27,7 @@ export interface DbmlCoreFacade {
 export type TableNameInput = string | { schema?: string; table: string };
 
 interface CoreModule {
-  Parser?: new () => { parse: (source: string, format: string) => { normalize?: () => unknown } | unknown };
+  Parser?: new () => { parse: (source: string, format: string) => unknown };
   importer?: { import?: (source: string, format: DbmlImportFormat, options?: unknown) => string; generateDbml?: (schemaJson: unknown) => string };
   exporter?: { export?: (source: string, format: DbmlExportFormat, options?: unknown) => string };
   ModelExporter?: { export?: (model: unknown, format: DbmlExportFormat, options?: unknown) => string };
@@ -93,7 +95,7 @@ export function getDbmlCore(): DbmlCoreFacade {
 }
 
 function loadCoreModule(): CoreModule {
-  if (!coreModule) coreModule = require("@dbml/core") as CoreModule;
+  if (!coreModule) coreModule = dbmlCoreModule as CoreModule;
   return coreModule;
 }
 
@@ -121,5 +123,17 @@ function fallbackFormatRecordValue(value: unknown): string {
   if (value === null || value === undefined) return "null";
   if (typeof value === "number" || typeof value === "bigint") return String(value);
   if (typeof value === "boolean") return value ? "true" : "false";
-  return `'${String(value).replace(/'/g, "\\'")}'`;
+  if (typeof value === "string") return `'${value.replace(/'/g, "\\'")}'`;
+  if (typeof value === "symbol") return `'${(value.description || "").replace(/'/g, "\\'")}'`;
+  if (typeof value === "function") return "'[function]'";
+  if (typeof value === "object") {
+    let serialized = "";
+    try {
+      serialized = JSON.stringify(value) || "";
+    } catch {
+      serialized = "[object]";
+    }
+    return `'${serialized.replace(/'/g, "\\'")}'`;
+  }
+  return "''";
 }

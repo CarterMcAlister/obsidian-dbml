@@ -71,7 +71,7 @@ export interface DbmlDiagnostic {
 }
 
 export interface DbmlParseResult {
-  database: unknown | null;
+  database: unknown;
   errors: DbmlDiagnostic[];
 }
 
@@ -119,8 +119,8 @@ export interface RendererFilterConfig {
 }
 
 export interface RendererUpdate {
-  database: unknown | null;
-  fullDatabase?: unknown | null;
+  database: unknown;
+  fullDatabase?: unknown;
   error?: string;
   views?: Record<string, string>;
   selectedViewId?: string | null;

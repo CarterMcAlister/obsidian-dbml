@@ -2,6 +2,7 @@ import { App, Modal, Notice, normalizePath, Setting, TFile } from "obsidian";
 import type { DbmlImportFormat } from "../dbml/core";
 import { DBML_IMPORT_FORMATS, importSourceToDbml, labelForImportFormat } from "../dbml/import";
 import type DbmlPlugin from "../main";
+import { confirmWithModal } from "./confirm-modal";
 
 export class ImportDbmlModal extends Modal {
   private format: DbmlImportFormat;
@@ -19,7 +20,7 @@ export class ImportDbmlModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Import DBML from SQL/SchemaRb/JSON" });
+    this.setTitle("Import from SQL, schema.rb, or JSON");
 
     new Setting(contentEl)
       .setName("Input format")
@@ -35,7 +36,7 @@ export class ImportDbmlModal extends Modal {
 
     new Setting(contentEl)
       .setName("Load vault file")
-      .setDesc("Enter a vault-relative path to a SQL, Schema.rb, or JSON file.")
+      .setDesc("Enter a vault-relative path to a SQL, schema.rb, or JSON file.")
       .addText((text) => text
         .setPlaceholder("schema.sql")
         .setValue(this.sourceFilePath)
@@ -44,21 +45,17 @@ export class ImportDbmlModal extends Modal {
 
     const sourceSetting = new Setting(contentEl)
       .setName("Source")
-      .setDesc("Paste SQL, Schema.rb, or JSON here.")
+      .setDesc("Paste SQL, schema.rb, or JSON here.")
       .addTextArea((text) => text
-        .setPlaceholder("CREATE TABLE users (id int primary key);")
+        .setPlaceholder("Paste SQL here")
         .setValue(this.source)
         .onChange((value) => this.source = value));
     sourceSetting.settingEl.addClass("obsidian-dbml-import-source");
     const textarea = sourceSetting.controlEl.querySelector("textarea");
     textarea?.setAttr("spellcheck", "false");
-    if (textarea) {
-      textarea.style.minHeight = "220px";
-      textarea.style.minWidth = "420px";
-    }
 
     new Setting(contentEl)
-      .setName("Include Records")
+      .setName("Include records")
       .setDesc("Preserve records when the input format supports them.")
       .addToggle((toggle) => toggle.setValue(this.includeRecords).onChange((value) => this.includeRecords = value));
 
@@ -145,7 +142,11 @@ function outputPath(app: App, filename: string): string {
 async function confirmOverwrite(app: App, path: string): Promise<boolean> {
   const existing = app.vault.getAbstractFileByPath(path);
   if (!(existing instanceof TFile)) return true;
-  return window.confirm(`${path} already exists. Overwrite it?`);
+  return confirmWithModal(app, {
+    title: "Overwrite file",
+    message: `${path} already exists. Overwrite it?`,
+    confirmText: "Overwrite"
+  });
 }
 
 async function writeTextFile(app: App, path: string, content: string): Promise<TFile> {

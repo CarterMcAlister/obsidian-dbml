@@ -465,7 +465,7 @@ function replaceOutsideDeclaration(source: string, oldToken: string, newToken: s
   if (!oldToken || oldToken === newToken) return source;
   const declarationMarker = `Table ${newDeclarationIdentifier}`;
   const escaped = escapeRegExp(oldToken);
-  const pattern = new RegExp(`(^|[^\\w\"'])(${escaped})(?![\\w\"'])`, "g");
+  const pattern = new RegExp(`(^|[^\\w"'])(${escaped})(?![\\w"'])`, "g");
   return source.replace(pattern, (match, prefix: string, token: string, offset: number) => {
     const tokenOffset = offset + prefix.length;
     const before = source.slice(Math.max(0, tokenOffset - declarationMarker.length - 2), tokenOffset + token.length + 2);
@@ -549,7 +549,7 @@ function normalizeRendererId(id: unknown): string | null {
 }
 
 function asDatabase(value: unknown): DbmlDatabaseLike {
-  return value && typeof value === "object" ? value as DbmlDatabaseLike : {};
+  return value && typeof value === "object" ? value : {};
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

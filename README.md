@@ -12,7 +12,7 @@ DBML authoring, validation, generation, and diagram preview.
 - Renders fenced Markdown code blocks using <code>```dbml</code> in Reading view.
 - Optional Live Preview diagram widgets for fenced DBML blocks.
 - DBML parse diagnostics through CodeMirror linting and preview error panels.
-- Per-diagram visual state persistence using `.dbdiagram` sidecar files or plugin data.
+- Per-diagram visual state persistence using hidden `.dbml-layout.json` sidecar files or plugin data.
 - Generate DBML from Postgres, MySQL, SQL Server, or Snowflake connection strings.
 - Supports `DiagramView` blocks with a view dropdown in the preview.
 - Adds `New database diagram` to folder/file context menus and the command palette.
@@ -49,7 +49,7 @@ Then reload Obsidian and enable the plugin.
 ## Commands
 
 - `DBML: New database diagram`
-- `DBML: Open DBML preview to the side`
+- `DBML: Open database diagram preview to the side`
 - `DBML: Generate DBML from Database Connection`
 - `DBML: Reset DBML diagram state`
 
@@ -89,4 +89,4 @@ The SQL importers come from `@dbml/core` and inherit its parser limitations. In 
 
 ### Source-edit safety
 
-Visual edits re-read and re-parse the current source before writing, update only the active `.dbml` file or Markdown fenced block, validate the generated DBML, and leave the file unchanged if a safe patch cannot be applied. Layout-only state continues to be stored in `.dbdiagram` sidecars or plugin data according to settings.
+Visual edits re-read and re-parse the current source before writing, update only the active `.dbml` file or Markdown fenced block, validate the generated DBML, and leave the file unchanged if a safe patch cannot be applied. Layout-only state continues to be stored in hidden `.dbml-layout.json` sidecars or plugin data according to settings.

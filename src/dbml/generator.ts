@@ -1,4 +1,5 @@
 import { Notice } from "obsidian";
+import * as connectorModule from "@dbml/connector";
 import { getDbmlCore } from "./core";
 
 export type DatabaseType = "postgres" | "mysql" | "mssql" | "snowflake";
@@ -15,9 +16,9 @@ export function connectionPlaceholder(type: DatabaseType): string {
 }
 
 export async function generateDbmlFromConnection(connection: string, databaseType: DatabaseType): Promise<string> {
-  const connectorModule = require("@dbml/connector") as { connector?: { fetchSchemaJson: (connection: string, databaseType: string) => Promise<unknown> } };
-  if (!connectorModule.connector) throw new Error("@dbml/connector export was not found.");
-  const schemaJson = await connectorModule.connector.fetchSchemaJson(connection, databaseType);
+  const connector = (connectorModule as { connector?: { fetchSchemaJson: (connection: string, databaseType: string) => Promise<unknown> } }).connector;
+  if (!connector) throw new Error("@dbml/connector export was not found.");
+  const schemaJson = await connector.fetchSchemaJson(connection, databaseType);
   return generateDbmlFromSchemaJson(schemaJson);
 }
 
@@ -27,7 +28,7 @@ export function generateDbmlFromSchemaJson(schemaJson: unknown): string {
     if (typeof generated === "string" && generated.trim()) return generated;
   } catch (error) {
     console.warn("DBML: @dbml/core importer.generateDbml failed; using manual fallback", error);
-    if (isDevelopmentBuild()) new Notice("DBML core schema generation failed; using limited manual fallback. Check developer console for details.");
+    if (isDevelopmentBuild()) new Notice("Core schema generation failed; using limited manual fallback. Check developer console for details.");
   }
   return manualSchemaJsonToDbml(schemaJson);
 }

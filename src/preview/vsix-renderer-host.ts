@@ -240,44 +240,144 @@ ${escapeScriptContent(patchRendererJs(rendererJs))}
 }
 
 function patchRendererJs(value: string): string {
-  const storeNeedle = "const lht=ad(`dbml`,()=>{let e=yn({}),t=yn(void 0),n=yn(!1);return{database:e,error:t,isDatabaseLoaded:n,updateDatabase:(r,i)=>{t.value=i,!i&&(e.value=r,n.value=!0)},testDatabase:()=>{";
-  const storeReplacement = "const lht=ad(`dbml`,()=>{let e=yn({}),t=yn({}),n=yn(void 0),r=yn(!1),i=yn(null),a=yn({}),o=yn({tables:[],schemas:[],tableGroups:[],stickyNotes:[]}),s=yn(void 0),d=yn(!1);return{database:e,fullDatabase:t,error:n,isDatabaseLoaded:r,selectedViewId:i,views:a,filterConfig:o,defaultViewName:s,isFilterConfigDirty:d,updateDatabase:(c,l,u)=>{n.value=l,!l&&(e.value=c,t.value=u?.fullDatabase||c,a.value=u?.views||{},i.value=u?.selectedViewId??null,o.value=u?.filterConfig||{tables:[],schemas:[],tableGroups:[],stickyNotes:[]},s.value=u?.defaultViewName,d.value=!!u?.isFilterConfigDirty,r.value=!0)},testDatabase:()=>{";
-  const setupNeedle = "let t=lht(),n=dht(),r=fht(),i=gi(`_diagramRef`),a=cc(()=>({stickyNote:!1,detailLevel:!1,tableSearchPanelTableGroup:!1,colorHeader:!1})),o=async()=>{await cr(),i.value?.display()},s=e=>{e.tablePositions&&n.updateTablePositions(e.tablePositions),e.tableGroupCollapseStates&&n.updateTableGroupCollapseStates(e.tableGroupCollapseStates),e.stickyNoteLayouts&&n.updateStickyNoteLayouts(e.stickyNoteLayouts),e.referencePaths&&n.updateReferencePaths(e.referencePaths)},c=e=>{n.setDetailLevel(e)};return";
-  const setupReplacement = "let t=lht(),n=dht(),r=fht(),i=gi(`_diagramRef`),g=globalThis.__OBSIDIAN_DBML_RENDERER_CONFIG__||{},a=cc(()=>g.shouldShowProTag||{stickyNote:!1,detailLevel:!1,tableSearchPanelTableGroup:!1,colorHeader:!1}),o=async()=>{await cr(),i.value?.display()},s=e=>{e.tablePositions&&n.updateTablePositions(e.tablePositions),e.tableGroupCollapseStates&&n.updateTableGroupCollapseStates(e.tableGroupCollapseStates),e.stickyNoteLayouts&&n.updateStickyNoteLayouts(e.stickyNoteLayouts),e.referencePaths&&n.updateReferencePaths(e.referencePaths)},c=e=>{n.setDetailLevel(e)},p=(e,t)=>{uht().postMessage({type:e,...t})},l=(...e)=>p(`tableRenamed`,{args:e}),d=(...e)=>p(`colorPicked`,{args:e}),f=e=>p(`viewSelected`,{viewId:e}),m=(...e)=>p(`refCreated`,{args:e}),h=e=>p(`noteUpdated`,{payload:e}),y=e=>p(`stickyNoteCreated`,{payload:e}),b=(...e)=>p(`stickyNoteEdited`,{args:e}),x=e=>p(`stickyNoteRemoved`,{payload:e}),S=e=>p(`editDataSample`,{payload:e}),C=e=>p(`filterChangeRequested`,{payload:e}),w=e=>p(`viewAdded`,{name:e}),E=(e,t)=>p(`viewRenamed`,{oldId:e,newName:t}),D=e=>p(`viewRemoved`,{viewId:e}),O=()=>p(`viewReset`,{}),k=()=>p(`focusEditor`,{}),A=e=>p(`focusElement`,{payload:e}),P=e=>p(`refMoved`,{payload:e});return";
-  const fullDatabaseNeedle = "\"full-normalized-database\":Cn(t).database";
-  const fullDatabaseReplacement = "\"full-normalized-database\":Cn(t).fullDatabase";
-  const statePropsNeedle = "\"reference-paths\":Cn(n).referencePaths,\"editable-sticky-note\":!1";
-  const statePropsReplacement = "\"reference-paths\":Cn(n).referencePaths,\"filter-config\":Cn(t).filterConfig,\"selected-view-id\":Cn(t).selectedViewId,views:Cn(t).views,\"default-view-name\":Cn(t).defaultViewName,\"is-filter-config-dirty\":Cn(t).isFilterConfigDirty,\"can-edit-note\":!!g.canEditNote,\"editable-sticky-note\":!!g.editableStickyNote";
-  const propsNeedle = "onToggleGrid:Cn(n).toggleGrid,onDetailLevelChanged:c}";
-  const propsReplacement = "onToggleGrid:Cn(n).toggleGrid,onDetailLevelChanged:c,onTableRenamed:l,onColorPicked:d,onViewSelected:f,onRefCreated:m,onNoteUpdated:h,onStickyNoteCreated:y,onStickyNoteEdited:b,onStickyNoteRemoved:x,onEditDataSample:S,onFilterChangeRequested:C,onViewAdded:w,onViewRenamed:E,onViewRemoved:D,onViewReset:O,onFocusEditor:k,onFocusElement:A,onRefMoved:P}";
-  const dynamicPropsNeedle = "`reference-paths`,`should-show-pro-tag`,`onTableMoved`";
-  const dynamicPropsReplacement = "`reference-paths`,`filter-config`,`selected-view-id`,`views`,`default-view-name`,`is-filter-config-dirty`,`can-edit-note`,`should-show-pro-tag`,`onTableMoved`";
-  const toolbarNeedle = "\"should-show-sticky-note-toolbar\":!1";
-  const toolbarReplacement = "\"should-show-sticky-note-toolbar\":!!g.shouldShowStickyNoteToolbar";
-  const hideDiagramActionsNeedle = "\"hide-diagram-view-actions\":!0";
-  const hideDiagramActionsReplacement = "\"hide-diagram-view-actions\":!!(g.featuresToggle&&g.featuresToggle.diagramViewRestricted)";
-  const canEditNeedle = "\"can-edit-note\":e.canEditNote";
-  const canEditReplacement = "\"can-edit-note\":!!g.canEditNote";
-  const updateNeedle = "case`update`:_en.updateDatabase(t.database,t.error);break;";
-  const updateReplacement = "case`update`:_en.updateDatabase(t.database,t.error,t);break;";
-  const editDataSampleNeedle = "if(f?.nextAction===`edit-data-sample`)r(`editDataSample`,o);";
-  const editDataSampleReplacement = "if(f?.nextAction===`edit-data-sample`)r(`editDataSample`,f.data||o);";
-  if (!value.includes(storeNeedle) || !value.includes(setupNeedle) || !value.includes(fullDatabaseNeedle) || !value.includes(statePropsNeedle) || !value.includes(propsNeedle) || !value.includes(dynamicPropsNeedle) || !value.includes(updateNeedle) || !value.includes(editDataSampleNeedle)) {
+  const replacements: Array<[string, string]> = [
+    [
+      `const Nht = pb(\`dbml\`, () => {
+			let e = r0({}),
+				s = r0(void 0),
+				t = r0(false);
+			return {
+				database: e,
+				error: s,
+				isDatabaseLoaded: t,
+				updateDatabase: (a, r) => {
+					(s.value = r), !r && ((e.value = a), (t.value = true));
+				},
+				testDatabase: () => {`,
+      `const Nht = pb(\`dbml\`, () => {
+			let e = r0({}),
+				s = r0({}),
+				t = r0(void 0),
+				a = r0(false),
+				r = r0(null),
+				l = r0({}),
+				T = r0({ tables: [], schemas: [], tableGroups: [], stickyNotes: [] }),
+				d = r0(void 0),
+				h = r0(false);
+			return {
+				database: e,
+				fullDatabase: s,
+				error: t,
+				isDatabaseLoaded: a,
+				selectedViewId: r,
+				views: l,
+				filterConfig: T,
+				defaultViewName: d,
+				isFilterConfigDirty: h,
+				updateDatabase: (I, L, v) => {
+					(t.value = L), !L && ((e.value = I), (s.value = v?.fullDatabase || I), (l.value = v?.views || {}), (r.value = v?.selectedViewId ?? null), (T.value = v?.filterConfig || { tables: [], schemas: [], tableGroups: [], stickyNotes: [] }), (d.value = v?.defaultViewName), (h.value = !!v?.isFilterConfigDirty), (a.value = true));
+				},
+				testDatabase: () => {`
+    ],
+    [
+      `r = An(\`_diagramRef\`),
+						l = T1(() => ({`,
+      `r = An(\`_diagramRef\`),
+						g = globalThis.__OBSIDIAN_DBML_RENDERER_CONFIG__ || {},
+						l = T1(() => g.shouldShowProTag || ({`
+    ],
+    [
+      `h = (I) => {
+							t.setDetailLevel(I);
+						};`,
+      `h = (I) => {
+							t.setDetailLevel(I);
+						},
+						p = (I, L) => window.acquireVsCodeApi().postMessage({ type: I, ...L }),
+						m = (...I) => p(\`tableRenamed\`, { args: I }),
+						b = (...I) => p(\`colorPicked\`, { args: I }),
+						x = (I) => p(\`viewSelected\`, { viewId: I }),
+						S = (...I) => p(\`refCreated\`, { args: I }),
+						C = (I) => p(\`noteUpdated\`, { payload: I }),
+						w = (I) => p(\`stickyNoteCreated\`, { payload: I }),
+						E = (...I) => p(\`stickyNoteEdited\`, { args: I }),
+						D = (I) => p(\`stickyNoteRemoved\`, { payload: I }),
+						O = (I) => p(\`editDataSample\`, { payload: I }),
+						k = (I) => p(\`filterChangeRequested\`, { payload: I }),
+						A = (I) => p(\`viewAdded\`, { name: I }),
+						P = (I, L) => p(\`viewRenamed\`, { oldId: I, newName: L }),
+						M = (I) => p(\`viewRemoved\`, { viewId: I }),
+						R = () => p(\`viewReset\`, {}),
+						N = () => p(\`focusEditor\`, {}),
+						F = (I) => p(\`focusElement\`, { payload: I }),
+						U = (I) => p(\`refMoved\`, { payload: I });`
+    ],
+    [`"full-normalized-database": Vt(s).database`, `"full-normalized-database": Vt(s).fullDatabase`],
+    [
+      `"reference-paths": Vt(t).referencePaths,
+										"editable-sticky-note": false,`,
+      `"reference-paths": Vt(t).referencePaths,
+										"filter-config": Vt(s).filterConfig,
+										"selected-view-id": Vt(s).selectedViewId,
+										views: Vt(s).views,
+										"default-view-name": Vt(s).defaultViewName,
+										"is-filter-config-dirty": Vt(s).isFilterConfigDirty,
+										"can-edit-note": !!g.canEditNote,
+										"editable-sticky-note": !!g.editableStickyNote,`
+    ],
+    [`"should-show-sticky-note-toolbar": false`, `"should-show-sticky-note-toolbar": !!g.shouldShowStickyNoteToolbar`],
+    [`"hide-diagram-view-actions": true`, `"hide-diagram-view-actions": !!(g.featuresToggle && g.featuresToggle.diagramViewRestricted)`],
+    [
+      `onToggleGrid: Vt(t).toggleGrid,
+										onDetailLevelChanged: h,`,
+      `onToggleGrid: Vt(t).toggleGrid,
+										onDetailLevelChanged: h,
+										onTableRenamed: m,
+										onColorPicked: b,
+										onViewSelected: x,
+										onRefCreated: S,
+										onNoteUpdated: C,
+										onStickyNoteCreated: w,
+										onStickyNoteEdited: E,
+										onStickyNoteRemoved: D,
+										onEditDataSample: O,
+										onFilterChangeRequested: k,
+										onViewAdded: A,
+										onViewRenamed: P,
+										onViewRemoved: M,
+										onViewReset: R,
+										onFocusEditor: N,
+										onFocusElement: F,
+										onRefMoved: U,`
+    ],
+    [
+      `\`reference-paths\`,
+										\`should-show-pro-tag\`,
+										\`onTableMoved\`,`,
+      `\`reference-paths\`,
+										\`filter-config\`,
+										\`selected-view-id\`,
+										\`views\`,
+										\`default-view-name\`,
+										\`is-filter-config-dirty\`,
+										\`can-edit-note\`,
+										\`should-show-pro-tag\`,
+										\`onTableMoved\`,`
+    ],
+    [`_81.updateDatabase(s.database, s.error);`, `_81.updateDatabase(s.database, s.error, s);`],
+    [
+      `if (O3?.nextAction === \`edit-data-sample\`)
+										a(\`editDataSample\`, Xn);`,
+      `if (O3?.nextAction === \`edit-data-sample\`)
+										a(\`editDataSample\`, O3.data || Xn);`
+    ]
+  ];
+
+  if (replacements.some(([needle]) => !value.includes(needle))) {
     console.warn("DBML: renderer edit event bridge patch did not match bundled renderer");
     return value;
   }
-  return value
-    .replace(storeNeedle, storeReplacement)
-    .replace(setupNeedle, setupReplacement)
-    .replace(fullDatabaseNeedle, fullDatabaseReplacement)
-    .replace(statePropsNeedle, statePropsReplacement)
-    .replace(propsNeedle, propsReplacement)
-    .replace(dynamicPropsNeedle, dynamicPropsReplacement)
-    .replace(toolbarNeedle, toolbarReplacement)
-    .replace(hideDiagramActionsNeedle, hideDiagramActionsReplacement)
-    .replace(canEditNeedle, canEditReplacement)
-    .replace(updateNeedle, updateReplacement)
-    .replace(editDataSampleNeedle, editDataSampleReplacement);
+  return replacements.reduce((patched, [needle, replacement]) => patched.replace(needle, replacement), value);
 }
 
 function escapeScriptContent(value: string): string {

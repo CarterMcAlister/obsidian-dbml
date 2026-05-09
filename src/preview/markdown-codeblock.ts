@@ -28,7 +28,15 @@ class DbmlCodeblockChild extends MarkdownRenderChild {
     };
   }
 
-  async onload(): Promise<void> {
+  onload(): void {
+    void this.initialize();
+  }
+
+  onunload(): void {
+    void this.disposeRenderer();
+  }
+
+  private async initialize(): Promise<void> {
     if (!this.plugin.settings.renderMarkdownCodeBlocks) {
       this.containerEl.createEl("pre", { text: this.source });
       return;
@@ -48,23 +56,23 @@ class DbmlCodeblockChild extends MarkdownRenderChild {
     if (this.plugin.settings.showSourceBelowMarkdownPreview) this.renderSourceToggle();
   }
 
-  async onunload(): Promise<void> {
+  private async disposeRenderer(): Promise<void> {
     if (this.state) await this.plugin.stateStore.saveImmediate(this.ref, this.state);
     this.renderer?.destroy();
   }
 
   private renderSourceToggle(): void {
-    const toggle = this.containerEl.createDiv({ cls: "obsidian-dbml-source-toggle", text: "Show DBML source" });
+    const toggle = this.containerEl.createDiv({ cls: "obsidian-dbml-source-toggle", text: "Show source" });
     let pre: HTMLPreElement | null = null;
     toggle.addEventListener("click", () => {
       if (pre) {
         pre.remove();
         pre = null;
-        toggle.setText("Show DBML source");
+        toggle.setText("Show source");
         return;
       }
       pre = this.containerEl.createEl("pre", { cls: "obsidian-dbml-source", text: this.source });
-      toggle.setText("Hide DBML source");
+      toggle.setText("Hide source");
     });
   }
 }
