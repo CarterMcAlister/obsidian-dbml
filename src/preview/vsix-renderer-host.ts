@@ -327,6 +327,11 @@ function patchRendererJs(value: string): string {
     ],
     [`"should-show-sticky-note-toolbar": false`, `"should-show-sticky-note-toolbar": !!g.shouldShowStickyNoteToolbar`],
     [`"hide-diagram-view-actions": true`, `"hide-diagram-view-actions": !!(g.featuresToggle && g.featuresToggle.diagramViewRestricted)`],
+    ['f2493c96: `${Vt(gE).POSITION.BOTTOM}px`', '"normalized-renderer-var-0061": `${Vt(gE).POSITION.BOTTOM}px`'],
+    ['f1028760: L.value', '"normalized-renderer-var-0060": L.value'],
+    ['v87817e62: `${Vt(gE).POSITION.BOTTOM}px`', '"normalized-renderer-var-0141": `${Vt(gE).POSITION.BOTTOM}px`'],
+    ['v230060f6: I.value', '"normalized-renderer-var-0134": I.value'],
+    ['v497651cc: s.value', '"normalized-renderer-var-0137": s.value'],
     [
       `onToggleGrid: Vt(t).toggleGrid,
 										onDetailLevelChanged: h,`,
